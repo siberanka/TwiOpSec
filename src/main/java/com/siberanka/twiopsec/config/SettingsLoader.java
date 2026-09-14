@@ -1,5 +1,6 @@
 package com.siberanka.twiopsec.config;
 
+import com.siberanka.twiopsec.security.CommandParser;
 import com.siberanka.twiopsec.security.PermissionPattern;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -46,6 +47,16 @@ public final class SettingsLoader {
             }
         }
 
+        Set<String> pluginManagerRoots = new LinkedHashSet<>(CommandParser.DEFAULT_PLUGIN_MANAGER_ROOTS);
+        for (String value : yaml.getStringList("hardening.runtime-plugin-manager-roots")) {
+            String root = normalizeRoot(value);
+            if (root != null) {
+                pluginManagerRoots.add(root);
+            } else {
+                warning.accept("Ignored invalid runtime plugin-manager root");
+            }
+        }
+
         return new SecuritySettings(
                 yaml.getBoolean("enforcement.enabled", true),
                 yaml.getBoolean("enforcement.check-on-join", true),
@@ -66,6 +77,7 @@ public final class SettingsLoader {
                 identities(yaml.getConfigurationSection("trusted.operators"), warning),
                 identities(yaml.getConfigurationSection("trusted.permission-holders"), warning),
                 yaml.getBoolean("hardening.block-runtime-unload-commands", true),
+                pluginManagerRoots,
                 yaml.getBoolean("hardening.audit-log", true),
                 yaml.getInt("hardening.audit-queue-capacity", 2048)
         );

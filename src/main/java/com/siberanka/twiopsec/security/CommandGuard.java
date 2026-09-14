@@ -23,16 +23,17 @@ public final class CommandGuard {
 
     public Decision inspect(CommandSender sender, String rawCommand) {
         SecuritySettings snapshot = settings.get();
-        if (!snapshot.enabled()) {
-            return Decision.ALLOW;
-        }
         CommandParser.ParsedCommand command = CommandParser.parse(rawCommand);
         if (command.label().isEmpty()) {
             return Decision.ALLOW;
         }
-        if (snapshot.blockRuntimeUnloadCommands() && CommandParser.attemptsRuntimeUnload(command)) {
+        if (snapshot.blockRuntimeUnloadCommands()
+                && CommandParser.attemptsRuntimeUnload(command, snapshot.runtimePluginManagerRoots())) {
             record(sender, "blocked-runtime-unload", command.label());
             return Decision.BLOCK_RUNTIME_UNLOAD;
+        }
+        if (!snapshot.enabled()) {
+            return Decision.ALLOW;
         }
         if (command.label().equals("op")) {
             if (command.arguments().isEmpty() || !engine.mayOpTarget(command.arguments().getFirst())) {

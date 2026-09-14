@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.siberanka.twiopsec"
-version = "1.0.0"
+version = "1.1.0"
 val pluginVersion = version.toString()
 
 repositories {
@@ -34,7 +34,7 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 tasks.processResources {
-    filesMatching("plugin.yml") {
+    filesMatching("paper-plugin.yml") {
         expand("version" to pluginVersion)
     }
 }

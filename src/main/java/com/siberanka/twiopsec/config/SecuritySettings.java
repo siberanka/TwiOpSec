@@ -30,6 +30,7 @@ public record SecuritySettings(
         Map<UUID, TrustedIdentity> trustedOperators,
         Map<UUID, TrustedIdentity> trustedPermissionHolders,
         boolean blockRuntimeUnloadCommands,
+        Set<String> runtimePluginManagerRoots,
         boolean auditLog,
         int auditQueueCapacity
 ) {
@@ -43,6 +44,9 @@ public record SecuritySettings(
                 .collect(Collectors.toUnmodifiableSet());
         trustedOperators = Map.copyOf(trustedOperators);
         trustedPermissionHolders = Map.copyOf(trustedPermissionHolders);
+        runtimePluginManagerRoots = runtimePluginManagerRoots.stream()
+                .map(value -> value.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
         periodicSeconds = Math.max(1, Math.min(periodicSeconds, 3600));
         auditQueueCapacity = Math.max(128, Math.min(auditQueueCapacity, 65_536));
     }

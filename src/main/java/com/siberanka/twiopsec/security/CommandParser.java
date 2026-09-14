@@ -6,8 +6,9 @@ import java.util.Locale;
 import java.util.Set;
 
 public final class CommandParser {
-    private static final Set<String> PLUGIN_MANAGERS = Set.of(
-            "plugman", "plugmanx", "plm", "pluginmanager", "pm"
+    public static final Set<String> DEFAULT_PLUGIN_MANAGER_ROOTS = Set.of(
+            "plugman", "plugmanx", "plm", "pluginmanager", "plugin-manager", "plugmanager",
+            "plugincontrol", "plugincontroller", "serverutils", "serverutilities", "pm", "pman"
     );
     private static final Set<String> UNLOAD_ACTIONS = Set.of("disable", "reload", "unload", "restart");
 
@@ -38,21 +39,27 @@ public final class CommandParser {
     }
 
     public static boolean attemptsRuntimeUnload(ParsedCommand command) {
+        return attemptsRuntimeUnload(command, DEFAULT_PLUGIN_MANAGER_ROOTS);
+    }
+
+    public static boolean attemptsRuntimeUnload(ParsedCommand command, Set<String> pluginManagerRoots) {
         if (command.label().equals("reload")
                 && (command.namespace().isEmpty() || command.namespace().equals("bukkit")
                 || command.namespace().equals("spigot"))) {
             return true;
         }
-        if (!PLUGIN_MANAGERS.contains(command.label()) || command.arguments().isEmpty()) {
+        if (!pluginManagerRoots.contains(command.label()) || command.arguments().isEmpty()) {
             return false;
         }
-        String action = command.arguments().getFirst().toLowerCase(Locale.ROOT);
-        if (!UNLOAD_ACTIONS.contains(action)) {
-            return false;
+        for (int index = 0; index < command.arguments().size(); index++) {
+            String action = stripPunctuation(command.arguments().get(index));
+            if (UNLOAD_ACTIONS.contains(action) && command.arguments().stream().skip(index + 1L)
+                    .map(CommandParser::canonicalTarget)
+                    .anyMatch(CommandParser::isProtectedTarget)) {
+                return true;
+            }
         }
-        return command.arguments().stream().skip(1)
-                .map(CommandParser::stripPunctuation)
-                .anyMatch(value -> value.equals("twiopsec") || value.equals("all") || value.equals("*"));
+        return false;
     }
 
     public static String stripNamespace(String label) {
@@ -62,7 +69,22 @@ public final class CommandParser {
     }
 
     private static String stripPunctuation(String value) {
-        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.*-]", "");
+        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.*-]", "")
+                .replaceFirst("^-+", "");
+    }
+
+    private static String canonicalTarget(String value) {
+        String normalized = value.toLowerCase(Locale.ROOT);
+        int colon = normalized.lastIndexOf(':');
+        if (colon >= 0) {
+            normalized = normalized.substring(colon + 1);
+        }
+        normalized = stripPunctuation(normalized);
+        return normalized.endsWith(".jar") ? normalized.substring(0, normalized.length() - 4) : normalized;
+    }
+
+    private static boolean isProtectedTarget(String value) {
+        return value.equals("twiopsec") || value.equals("all") || value.equals("*");
     }
 
     public record ParsedCommand(String label, String namespace, List<String> arguments) {

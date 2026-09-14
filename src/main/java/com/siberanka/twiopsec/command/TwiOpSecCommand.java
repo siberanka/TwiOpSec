@@ -5,23 +5,22 @@ import com.siberanka.twiopsec.config.ImportReport;
 import com.siberanka.twiopsec.config.SecuritySettings;
 import com.siberanka.twiopsec.security.CheckTrigger;
 import com.siberanka.twiopsec.security.SecurityEngine;
+import io.papermc.paper.command.brigadier.BasicCommand;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
-import org.bukkit.command.RemoteConsoleCommandSender;
-import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
-public final class TwiOpSecCommand implements CommandExecutor, TabCompleter {
+public final class TwiOpSecCommand implements BasicCommand {
     private static final List<String> SUBCOMMANDS = List.of("status", "reload", "import", "check");
     private final TwiOpSecPlugin plugin;
     private final AtomicReference<SecuritySettings> settings;
@@ -35,11 +34,11 @@ public final class TwiOpSecCommand implements CommandExecutor, TabCompleter {
     }
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
-                             @NotNull String label, @NotNull String[] args) {
+    public void execute(@NotNull CommandSourceStack source, @NotNull String[] args) {
+        CommandSender sender = source.getSender();
         if (!authorized(sender)) {
-            sender.sendMessage(Component.text("TwiOpSec: trusted administrator identity required."));
-            return true;
+            sender.sendMessage(Component.translatable("command.unknown.command").color(NamedTextColor.RED));
+            return;
         }
         String action = args.length == 0 ? "status" : args[0].toLowerCase(Locale.ROOT);
         switch (action) {
@@ -57,19 +56,10 @@ public final class TwiOpSecCommand implements CommandExecutor, TabCompleter {
             case "check" -> runCheck(sender);
             default -> sender.sendMessage(Component.text("Usage: /twiopsec <status|reload|import|check>"));
         }
-        return true;
     }
 
     private boolean authorized(CommandSender sender) {
-        if (sender instanceof ConsoleCommandSender || sender instanceof RemoteConsoleCommandSender) {
-            return true;
-        }
-        if (!(sender instanceof Player player) || !sender.hasPermission("twiopsec.admin")) {
-            return false;
-        }
-        SecuritySettings snapshot = settings.get();
-        return snapshot.isTrustedOperator(player.getUniqueId())
-                || snapshot.isTrustedPermissionHolder(player.getUniqueId());
+        return sender instanceof ConsoleCommandSender;
     }
 
     private void status(CommandSender sender) {
@@ -96,12 +86,25 @@ public final class TwiOpSecCommand implements CommandExecutor, TabCompleter {
     }
 
     @Override
-    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
-                                                 @NotNull String alias, @NotNull String[] args) {
-        if (!authorized(sender) || args.length != 1) {
+    public @NotNull Collection<String> suggest(@NotNull CommandSourceStack source, @NotNull String[] args) {
+        CommandSender sender = source.getSender();
+        if (!visibleTo(sender) || args.length != 1) {
             return List.of();
         }
         String prefix = args[0].toLowerCase(Locale.ROOT);
         return SUBCOMMANDS.stream().filter(value -> value.startsWith(prefix)).toList();
+    }
+
+    @Override
+    public boolean canUse(@NotNull CommandSender sender) {
+        return visibleTo(sender);
+    }
+
+    private boolean visibleTo(CommandSender sender) {
+        if (authorized(sender)) {
+            return true;
+        }
+        return sender instanceof Player player && player.isOp()
+                && settings.get().isTrustedOperator(player.getUniqueId());
     }
 }

@@ -20,6 +20,9 @@ class CommandParserTest {
     void blocksKnownRuntimeUnloadFormsButNotServerStopOrDatapackReload() {
         assertTrue(CommandParser.attemptsRuntimeUnload(CommandParser.parse("plugman disable TwiOpSec")));
         assertTrue(CommandParser.attemptsRuntimeUnload(CommandParser.parse("plugmanx:plm reload all")));
+        assertTrue(CommandParser.attemptsRuntimeUnload(CommandParser.parse("serverutils plugin unload TwiOpSec.jar")));
+        assertTrue(CommandParser.attemptsRuntimeUnload(CommandParser.parse("plugmanager disable --all")));
+        assertTrue(CommandParser.attemptsRuntimeUnload(CommandParser.parse("plugman reload plugin:TwiOpSec")));
         assertTrue(CommandParser.attemptsRuntimeUnload(CommandParser.parse("bukkit:reload")));
         assertFalse(CommandParser.attemptsRuntimeUnload(CommandParser.parse("minecraft:reload")));
         assertFalse(CommandParser.attemptsRuntimeUnload(CommandParser.parse("stop")));

@@ -50,5 +50,20 @@ legacy-import:
 
 hardening:
   block-runtime-unload-commands: true
+  # Add the command root of any runtime plugin manager installed on the server.
+  # Built-in known roots are always retained when this list is edited.
+  runtime-plugin-manager-roots:
+    - "plugman"
+    - "plugmanx"
+    - "plm"
+    - "pluginmanager"
+    - "plugin-manager"
+    - "plugmanager"
+    - "plugincontrol"
+    - "plugincontroller"
+    - "serverutils"
+    - "serverutilities"
+    - "pm"
+    - "pman"
   audit-log: true
   audit-queue-capacity: 2048

@@ -9,8 +9,9 @@ import com.siberanka.twiopsec.security.AuditLogger;
 import com.siberanka.twiopsec.security.CommandGuard;
 import com.siberanka.twiopsec.security.SecurityEngine;
 import com.siberanka.twiopsec.security.SecurityListener;
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.Bukkit;
-import org.bukkit.command.PluginCommand;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -20,14 +21,15 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
 public final class TwiOpSecPlugin extends JavaPlugin {
     private final AtomicReference<SecuritySettings> settings = new AtomicReference<>();
     private final AtomicReference<AuditLogger> audit = new AtomicReference<>();
     private final AtomicBoolean unexpectedDisableMarked = new AtomicBoolean();
+    private final AtomicBoolean commandsRegistered = new AtomicBoolean();
     private SecurityEngine engine;
     private LegacyImporter importer;
     private volatile boolean startupComplete;
@@ -66,15 +68,22 @@ public final class TwiOpSecPlugin extends JavaPlugin {
         CommandGuard guard = new CommandGuard(settings, engine, audit::get);
         getServer().getPluginManager().registerEvents(new SecurityListener(this, settings, engine, guard), this);
 
-        PluginCommand command = Objects.requireNonNull(getCommand("twiopsec"), "twiopsec command");
-        TwiOpSecCommand executor = new TwiOpSecCommand(this, settings, engine);
-        command.setExecutor(executor);
-        command.setTabCompleter(executor);
+        registerCommands();
         engine.restartPeriodicTask();
         startupComplete = true;
 
         getLogger().info("TwiOpSec enabled with " + loaded.trustedOperators().size()
                 + " trusted operators and " + loaded.protectedPermissions().size() + " protected permissions.");
+    }
+
+    private void registerCommands() {
+        if (!commandsRegistered.compareAndSet(false, true)) {
+            return;
+        }
+        TwiOpSecCommand command = new TwiOpSecCommand(this, settings, engine);
+        getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
+                event.registrar().register("twiopsec", "Inspect and administer TwiOpSec from the local console.",
+                        java.util.List.of("twios", "opsec"), command));
     }
 
     @Override
@@ -104,6 +113,13 @@ public final class TwiOpSecPlugin extends JavaPlugin {
             old.close();
         }
         engine.restartPeriodicTask();
+        refreshPlayerCommandTrees();
+    }
+
+    private void refreshPlayerCommandTrees() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.getScheduler().execute(this, player::updateCommands, null, 1L);
+        }
     }
 
     public synchronized ImportReport importLegacy(boolean force) {
