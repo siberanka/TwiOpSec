@@ -3,23 +3,15 @@ package com.siberanka.twiopsec.config;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,8 +21,7 @@ import java.util.function.Consumer;
 
 /** Transactional, idempotent importer for the public T2C-OPSecurity YAML schema. */
 public final class LegacyImporter {
-    private static final long MAX_YAML_BYTES = 2L * 1024L * 1024L;
-    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("uuuuMMdd-HHmmss")
+    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("uuuuMMdd-HHmmss.SSS")
             .withZone(ZoneOffset.UTC);
     private static final List<String> LEGACY_FILES = List.of(
             "config.yml", "opWhitelist.yml", "permissionWhitelist.yml",
@@ -57,9 +48,12 @@ public final class LegacyImporter {
         try {
             Files.createDirectories(dataFolder);
             Path marker = dataFolder.resolve("migration-v1.yml");
+            if (Files.exists(marker, LinkOption.NOFOLLOW_LINKS)) {
+                validateMarker(marker);
+            }
             if (!force && Files.isRegularFile(marker, LinkOption.NOFOLLOW_LINKS)) {
                 return new ImportReport(ImportReport.Status.ALREADY_IMPORTED, 0, 0, 0,
-                        "migration-v1.yml exists");
+                        "validated migration-v1.yml exists");
             }
             Path source = resolveSource(sourceFolderName);
             if (source == null) {
@@ -69,33 +63,43 @@ public final class LegacyImporter {
             Path configFile = checkedYaml(source.resolve("config.yml"), true);
             Path opFile = checkedYaml(source.resolve("opWhitelist.yml"), true);
             Path permissionFile = checkedYaml(source.resolve("permissionWhitelist.yml"), true);
-            YamlConfiguration legacyConfig = load(configFile);
-            YamlConfiguration legacyOperators = load(opFile);
-            YamlConfiguration legacyPermissions = load(permissionFile);
+            SecureYaml.Document legacyConfigDocument = SecureYaml.load(configFile);
+            SecureYaml.Document legacyOperatorsDocument = SecureYaml.load(opFile);
+            SecureYaml.Document legacyPermissionsDocument = SecureYaml.load(permissionFile);
+            YamlConfiguration legacyConfig = legacyConfigDocument.configuration();
+            YamlConfiguration legacyOperators = legacyOperatorsDocument.configuration();
+            YamlConfiguration legacyPermissions = legacyPermissionsDocument.configuration();
+            requireSection(legacyOperators, "opWhitelist", "opWhitelist.yml");
+            requireSection(legacyPermissions, "permissionWhitelist", "permissionWhitelist.yml");
+            validateLegacyTypes(legacyConfig, legacyOperators, legacyPermissions);
 
-            File targetFile = dataFolder.resolve("config.yml").toFile();
-            YamlConfiguration target = YamlConfiguration.loadConfiguration(targetFile);
+            Path targetFile = dataFolder.resolve("config.yml");
+            SecureYaml.Document targetDocument = SecureYaml.load(targetFile);
+            SettingsLoader.loadAll(targetFile, warning);
+            YamlConfiguration target = targetDocument.configuration();
             MergeCounts counts = merge(target, legacyConfig, legacyOperators, legacyPermissions);
+            SettingsLoader.validateGenerated(target, warning);
 
             String timestamp = STAMP.format(Instant.now(clock));
-            Path backup = dataFolder.resolve("migration-backups").resolve(timestamp);
-            backupFiles(source, backup);
+            Path backup = uniqueBackup(timestamp);
+            backupSnapshot(backup.resolve("config.yml"), legacyConfigDocument);
+            backupSnapshot(backup.resolve("opWhitelist.yml"), legacyOperatorsDocument);
+            backupSnapshot(backup.resolve("permissionWhitelist.yml"), legacyPermissionsDocument);
+            backupOptionalFiles(source, backup);
             Path libSource = source.getParent().resolve("T2CodeLib");
             if (Files.isDirectory(libSource, LinkOption.NOFOLLOW_LINKS)) {
                 Path libConfig = libSource.resolve("config.yml");
-                if (isSafeRegularYaml(libConfig)) {
-                    Files.createDirectories(backup.resolve("T2CodeLib"));
-                    Files.copy(libConfig, backup.resolve("T2CodeLib/config.yml"),
-                            StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                SecureYaml.Document libraryDocument = optionalSnapshot(libConfig, libSource.toRealPath());
+                if (libraryDocument != null) {
+                    backupSnapshot(backup.resolve("T2CodeLib/config.yml"), libraryDocument);
                 }
             }
 
-            atomicSave(target, targetFile.toPath());
-            writeMarker(marker, source.getFileName().toString(), timestamp, Map.of(
-                    "config.yml", sha256(configFile),
-                    "opWhitelist.yml", sha256(opFile),
-                    "permissionWhitelist.yml", sha256(permissionFile)
-            ), counts);
+            YamlConfiguration markerState = markerState(marker, source.getFileName().toString(), timestamp, Map.of(
+                    "config.yml", legacyConfigDocument.sha256(),
+                    "opWhitelist.yml", legacyOperatorsDocument.sha256(),
+                    "permissionWhitelist.yml", legacyPermissionsDocument.sha256()), counts);
+            commitConfigAndMarker(targetFile, target, targetDocument.bytes(), marker, markerState);
             return new ImportReport(ImportReport.Status.IMPORTED, counts.operators,
                     counts.permissionHolders, counts.permissions, "transaction committed");
         } catch (IOException | RuntimeException exception) {
@@ -128,23 +132,14 @@ public final class LegacyImporter {
             return null;
         }
         long size = Files.size(path);
-        if (size <= 0 || size > MAX_YAML_BYTES) {
+        if (size <= 0 || size > SecureYaml.MAX_BYTES) {
             throw new IOException("Legacy YAML size is outside safety limits: " + path.getFileName());
         }
         return path;
     }
 
-    private static boolean isSafeRegularYaml(Path path) throws IOException {
-        return Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
-                && Files.size(path) > 0 && Files.size(path) <= MAX_YAML_BYTES;
-    }
-
-    private static YamlConfiguration load(Path path) {
-        return path == null ? new YamlConfiguration() : YamlConfiguration.loadConfiguration(path.toFile());
-    }
-
     private MergeCounts merge(YamlConfiguration target, YamlConfiguration config,
-                              YamlConfiguration operators, YamlConfiguration permissions) {
+                              YamlConfiguration operators, YamlConfiguration permissions) throws IOException {
         target.set("enforcement.enabled",
                 operators.getBoolean("opWhitelist.enable", true)
                         || permissions.getBoolean("permissionWhitelist.enable", true));
@@ -181,22 +176,28 @@ public final class LegacyImporter {
         return new MergeCounts(opCount, permissionCount, protectedPermissions.size());
     }
 
-    private int mergeIdentities(YamlConfiguration target, String targetPath, ConfigurationSection source) {
+    private int mergeIdentities(YamlConfiguration target, String targetPath, ConfigurationSection source)
+            throws IOException {
         LinkedHashMap<UUID, TrustedIdentity> identities = readTargetIdentities(target.getConfigurationSection(targetPath));
         if (source != null) {
             for (String key : source.getKeys(false)) {
+                Object rawUuidValue = source.get(key + ".uuid");
+                if (rawUuidValue instanceof Number number && number.longValue() == 0L) {
+                    // T2C ships an unquoted numeric all-zero placeholder in some configurations.
+                    continue;
+                }
                 String rawUuid = source.getString(key + ".uuid", "");
                 String name = source.getString(key + ".name", "").trim();
                 if (!name.matches("[A-Za-z0-9_]{1,16}")) {
-                    continue;
+                    throw new IOException("Invalid legacy player name at " + source.getCurrentPath() + '.' + key);
                 }
                 try {
                     UUID uuid = UUID.fromString(SettingsLoader.canonicalUuid(rawUuid));
                     if (uuid.getMostSignificantBits() != 0L || uuid.getLeastSignificantBits() != 0L) {
                         identities.putIfAbsent(uuid, new TrustedIdentity(uuid, name));
                     }
-                } catch (IllegalArgumentException ignored) {
-                    // Invalid and upstream placeholder identities are deliberately not trusted.
+                } catch (IllegalArgumentException exception) {
+                    throw new IOException("Invalid legacy UUID at " + source.getCurrentPath() + '.' + key, exception);
                 }
             }
         }
@@ -226,37 +227,67 @@ public final class LegacyImporter {
         return result;
     }
 
-    private List<String> safeCommands(List<String> commands, boolean enabled) {
+    private List<String> safeCommands(List<String> commands, boolean enabled) throws IOException {
         if (!enabled) {
             return List.of();
         }
+        if (commands.size() > 16) {
+            throw new IOException("Legacy enforcement command count exceeds 16");
+        }
         List<String> result = new ArrayList<>();
         for (String command : commands) {
-            if (result.size() == 16) {
-                break;
+            if (command == null || command.isBlank() || command.length() > 256
+                    || command.indexOf('\r') >= 0 || command.indexOf('\n') >= 0
+                    || command.indexOf('\0') >= 0) {
+                throw new IOException("Legacy enforcement command is outside safety limits");
             }
-            if (command != null && !command.isBlank() && command.length() <= 256
-                    && command.indexOf('\r') < 0 && command.indexOf('\n') < 0) {
-                result.add(command.startsWith("/") ? command.substring(1) : command);
-            }
+            result.add(command.startsWith("/") ? command.substring(1) : command);
         }
         return result;
     }
 
-    private static void backupFiles(Path source, Path backup) throws IOException {
-        for (String relative : LEGACY_FILES) {
-            Path input = source.resolve(relative).normalize();
-            if (!input.startsWith(source) || !isSafeRegularYaml(input)) {
-                continue;
+    private Path uniqueBackup(String timestamp) throws IOException {
+        Path root = dataFolder.resolve("migration-backups");
+        Files.createDirectories(root);
+        for (int suffix = 0; suffix < 1000; suffix++) {
+            String name = suffix == 0 ? timestamp : timestamp + '-' + suffix;
+            Path candidate = root.resolve(name);
+            try {
+                return Files.createDirectory(candidate);
+            } catch (java.nio.file.FileAlreadyExistsException ignored) {
+                // A distinct directory prevents a forced import from overwriting rollback evidence.
             }
-            Path output = backup.resolve(relative);
-            Files.createDirectories(output.getParent());
-            Files.copy(input, output, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+        }
+        throw new IOException("Could not allocate a unique migration backup directory");
+    }
+
+    private static void backupSnapshot(Path output, SecureYaml.Document document) throws IOException {
+        SecureYaml.atomicWrite(output, document.bytes());
+    }
+
+    private static void backupOptionalFiles(Path source, Path backup) throws IOException {
+        for (String relative : LEGACY_FILES.subList(3, LEGACY_FILES.size())) {
+            SecureYaml.Document document = optionalSnapshot(source.resolve(relative), source);
+            if (document != null) {
+                backupSnapshot(backup.resolve(relative), document);
+            }
         }
     }
 
-    private static void writeMarker(Path marker, String sourceName, String timestamp,
-                                    Map<String, String> hashes, MergeCounts counts) throws IOException {
+    private static SecureYaml.Document optionalSnapshot(Path path, Path allowedRoot) throws IOException {
+        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+            return null;
+        }
+        Path realRoot = allowedRoot.toRealPath();
+        Path realPath = path.toRealPath();
+        if (!realPath.startsWith(realRoot) || realPath.equals(realRoot)) {
+            throw new IOException("Optional migration file escaped its source directory: " + path.getFileName());
+        }
+        return SecureYaml.load(realPath);
+    }
+
+    private static YamlConfiguration markerState(Path marker, String sourceName, String timestamp,
+                                                 Map<String, String> hashes, MergeCounts counts) throws IOException {
         YamlConfiguration state = new YamlConfiguration();
         state.set("schema-version", 1);
         state.set("status", "committed");
@@ -266,38 +297,132 @@ public final class LegacyImporter {
         state.set("counts.operators", counts.operators);
         state.set("counts.permission-holders", counts.permissionHolders);
         state.set("counts.protected-permissions", counts.permissions);
-        atomicSave(state, marker);
+        SecureYaml.parse(state.saveToString(), marker.getFileName().toString());
+        return state;
     }
 
-    private static void atomicSave(YamlConfiguration yaml, Path target) throws IOException {
-        Files.createDirectories(target.toAbsolutePath().getParent());
-        Path temporary = Files.createTempFile(target.toAbsolutePath().getParent(), target.getFileName().toString(), ".tmp");
-        boolean moved = false;
-        try {
-            yaml.save(temporary.toFile());
-            try {
-                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException ignored) {
-                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+    private static void commitConfigAndMarker(Path config, YamlConfiguration newConfig, byte[] originalConfig,
+                                              Path marker, YamlConfiguration newMarker) throws IOException {
+        byte[] originalMarker = null;
+        if (Files.exists(marker, LinkOption.NOFOLLOW_LINKS)) {
+            if (!Files.isRegularFile(marker, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Migration marker is not a regular file");
             }
-            moved = true;
-        } finally {
-            if (!moved) {
-                Files.deleteIfExists(temporary);
+            originalMarker = Files.readAllBytes(marker);
+        }
+        boolean configCommitted = false;
+        try {
+            SecureYaml.atomicWrite(config, newConfig.saveToString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            configCommitted = true;
+            SecureYaml.atomicWrite(marker, newMarker.saveToString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException | RuntimeException exception) {
+            IOException failure = exception instanceof IOException ioException
+                    ? ioException : new IOException("Migration commit failed", exception);
+            if (configCommitted) {
+                try {
+                    SecureYaml.atomicWrite(config, originalConfig);
+                    if (originalMarker == null) {
+                        Files.deleteIfExists(marker);
+                    } else {
+                        SecureYaml.atomicWrite(marker, originalMarker);
+                    }
+                } catch (IOException rollbackFailure) {
+                    failure.addSuppressed(rollbackFailure);
+                }
+            }
+            throw failure;
+        }
+    }
+
+    private static void validateMarker(Path marker) throws IOException {
+        YamlConfiguration state = SecureYaml.load(marker).configuration();
+        if (state.getInt("schema-version", -1) != 1 || !"committed".equals(state.getString("status"))) {
+            throw new IOException("Migration marker is not a committed schema-version 1 document");
+        }
+        for (String name : List.of("config.yml", "opWhitelist.yml", "permissionWhitelist.yml")) {
+            String hash = state.getString("source-sha256." + name, "");
+            if (!hash.matches("[0-9a-f]{64}")) {
+                throw new IOException("Migration marker has an invalid source hash for " + name);
             }
         }
     }
 
-    private static String sha256(Path path) throws IOException {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try (InputStream input = Files.newInputStream(path);
-                 DigestInputStream hashing = new DigestInputStream(input, digest)) {
-                hashing.transferTo(java.io.OutputStream.nullOutputStream());
+    private static void requireSection(YamlConfiguration yaml, String path, String sourceName) throws IOException {
+        if (!yaml.isConfigurationSection(path)) {
+            throw new IOException(sourceName + " is missing required section " + path);
+        }
+    }
+
+    private static void validateLegacyTypes(YamlConfiguration config, YamlConfiguration operators,
+                                            YamlConfiguration permissions) throws IOException {
+        for (String path : List.of("check.onJoin.enable", "check.onCommand.enable", "check.onInteract.enable",
+                "check.onChat.enable", "check.timer.enable")) {
+            requireOptionalType(config, path, Boolean.class);
+        }
+        requireOptionalInteger(config, "check.timer.refreshInSec");
+        for (String path : List.of("opWhitelist.enable", "opWhitelist.playerMustBeOnlineToOp",
+                "opWhitelist.noOpPlayerDeop.enable", "opWhitelist.noOpPlayerKick.enable",
+                "opWhitelist.customCommands.enable")) {
+            requireOptionalType(operators, path, Boolean.class);
+        }
+        requireOptionalStringList(operators, "opWhitelist.customCommands.commands");
+        validateLegacyIdentities(operators, "opWhitelist.whitelist");
+        for (String path : List.of("permissionWhitelist.enable", "permissionWhitelist.playerWithPermissionKick",
+                "permissionWhitelist.customCommands.enable")) {
+            requireOptionalType(permissions, path, Boolean.class);
+        }
+        requireOptionalStringList(permissions, "permissionWhitelist.permissions");
+        requireOptionalStringList(permissions, "permissionWhitelist.customCommands.commands");
+        validateLegacyIdentities(permissions, "permissionWhitelist.whitelist");
+    }
+
+    private static void validateLegacyIdentities(YamlConfiguration yaml, String path) throws IOException {
+        Object raw = yaml.get(path);
+        if (raw == null) {
+            return;
+        }
+        ConfigurationSection section = yaml.getConfigurationSection(path);
+        if (section == null) {
+            throw new IOException(path + " must be a mapping");
+        }
+        if (section.getKeys(false).size() > 4096) {
+            throw new IOException(path + " contains too many identities");
+        }
+        for (String key : section.getKeys(false)) {
+            if (!section.isConfigurationSection(key)) {
+                throw new IOException(path + '.' + key + " must be a mapping");
             }
-            return HexFormat.of().formatHex(digest.digest());
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 unavailable", exception);
+            requireOptionalType(section, key + ".name", String.class);
+            Object uuid = section.get(key + ".uuid");
+            if (!(uuid instanceof String) && !(uuid instanceof Number number && number.longValue() == 0L)) {
+                throw new IOException(path + '.' + key + ".uuid must be text or the legacy zero placeholder");
+            }
+        }
+    }
+
+    private static void requireOptionalStringList(ConfigurationSection section, String path) throws IOException {
+        Object raw = section.get(path);
+        if (raw == null) {
+            return;
+        }
+        if (!(raw instanceof List<?> values) || values.stream().anyMatch(value -> !(value instanceof String))) {
+            throw new IOException(path + " must contain only strings");
+        }
+    }
+
+    private static void requireOptionalInteger(ConfigurationSection section, String path) throws IOException {
+        Object raw = section.get(path);
+        if (raw != null && !(raw instanceof Byte || raw instanceof Short || raw instanceof Integer
+                || raw instanceof Long)) {
+            throw new IOException(path + " must be an integer");
+        }
+    }
+
+    private static void requireOptionalType(ConfigurationSection section, String path, Class<?> type)
+            throws IOException {
+        Object raw = section.get(path);
+        if (raw != null && !type.isInstance(raw)) {
+            throw new IOException(path + " must be " + type.getSimpleName());
         }
     }
 

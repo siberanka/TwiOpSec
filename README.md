@@ -18,15 +18,16 @@ Folia satırındaki `beta`, TwiOpSec'in değil test edilen resmî Folia sunucu y
 
 ## Koruma modeli
 
-- Operatör ve korunan-izin güven listeleri birbirinden ayrıdır ve UUID ile karar verir.
+- Operatör ve korunan-izin güven listeleri UUID ile karar verir; güvenilir operatörler ayrıca korunan izinler için güvenilir kabul edilir.
 - Yetkisiz OP tespit edildiğinde varsayılan olarak deop ve kick uygulanır.
+- Başlangıçta sunucunun kalıcı OP kayıtları UUID beyaz listesiyle uzlaştırılır; önceden kalmış yetkisiz çevrimdışı OP kayıtları temizlenir.
 - Join, command, interact, chat ve periyodik kontroller T2C ayarlarından taşınabilir.
 - `/op` hedefi güven listesinde değilse engellenir; çevrimdışı hedef varsayılan olarak reddedilir.
 - LuckPerms/PEX benzeri ayrıcalık komutları güvenilmeyen oyuncu ve command block göndericilerine kapatılır.
-- Bilinen ve yapılandırılabilir plugin-manager komut kökleriyle TwiOpSec'i runtime'da unload/reload etme ve Paper/Bukkit `/reload` denemeleri engellenir.
+- Vanilla `execute`/`return`, yaygın dispatch wrapper zincirleri ve sınırlı/özyineleme güvenli `commands.yml` alias genişletmeleri içindeki komutlar da incelenir. Bilinen ve yapılandırılabilir plugin-manager kökleriyle TwiOpSec'i runtime'da unload/reload etme ve Paper/Bukkit `/reload` denemeleri engellenir.
 - Paper eklenti classloader izolasyonu kullanılır; JAR içinde legacy `plugin.yml` bulunmaz.
 - Sunucunun gerçek `stop` akışı engellenmez. Beklenmeyen disable sonraki açılış için kanıt işareti bırakır.
-- Audit yazımı sınırlı kuyrukta ayrı bir iş parçacığında yapılır; oyun thread'i disk I/O için bekletilmez.
+- Audit yazımı sınırlı kuyrukta ayrı bir iş parçacığında yapılır; I/O hatasında yeniden denenir, 16 MiB'de döner ve beş arşiv saklar.
 
 Varsayılan korunan düğümler şunlardır ve import sırasında silinmez: `*`, `minecraft.*`, `minecraft.command.*`, `minecraft.command.op`, `bukkit.command.*`, `paper.command.*`, `essentials.*`, `luckperms.*`, `twiopsec.admin`.
 
@@ -34,9 +35,9 @@ Varsayılan korunan düğümler şunlardır ve import sırasında silinmez: `*`,
 
 ## Kurulum ve T2C importu
 
-1. Sunucuyu durdurun ve `plugins/TwiOpSec-1.1.0.jar` dosyasını yerleştirin.
+1. Sunucuyu durdurun ve `plugins/TwiOpSec-1.1.1.jar` dosyasını yerleştirin.
 2. Eski `plugins/T2C-OPSecurity/` klasörünü ilk açılışta yerinde bırakın.
-3. Sunucuyu başlatın. TwiOpSec, `config.yml`, `opWhitelist.yml` ve `permissionWhitelist.yml` dosyalarının tamamını okuyamazsa güvenli biçimde başlamaz.
+3. Sunucuyu başlatın. TwiOpSec, `config.yml`, `opWhitelist.yml` ve `permissionWhitelist.yml` dosyalarının tamamını güvenli biçimde okuyamazsa importu commit etmez. Geçerli son ayar yoksa fail-closed olarak sunucuyu durdurur.
 4. Logdaki import sayılarını kontrol edin ve `plugins/TwiOpSec/config.yml` içindeki iki güven listesini gözden geçirin.
 5. Eski eklentiyi ve T2CodeLib'i ancak doğrulamadan sonra kaldırın. Geri dönüş için eski JAR'ları ve klasörleri saklayın.
 
@@ -45,9 +46,10 @@ Import özellikleri:
 - Mevcut TwiOpSec değerleri, zorunlu varsayılanlar ve eski izinler union ile birleştirilir.
 - Operatör ve permission whitelist kimlikleri UUID bazında ayrı ayrı korunur.
 - `check.onJoin`, `onCommand`, `onInteract`, `onChat`, timer, deop/kick, çevrimiçi OP hedefi ve güvenli özel komutlar taşınır.
-- Kaynak YAML boyutu 2 MiB ile sınırlıdır; symlink/path traversal reddedilir.
-- Önce `plugins/TwiOpSec/migration-backups/<UTC>/` yedeği alınır, sonra config atomik olarak değiştirilir ve SHA-256 içeren `migration-v1.yml` yazılır.
-- Marker bulunduğunda otomatik import idempotenttir. Bilinçli yeniden import: `/twiopsec import`.
+- Kaynak ve hedef YAML boyutu 2 MiB ile sınırlıdır; geçersiz UTF-8, duplicate key, özel tip etiketi, alias/nesting yükü, symlink ve path traversal reddedilir.
+- Önce benzersiz `plugins/TwiOpSec/migration-backups/<UTC>/` yedeği alınır. Config/marker commitinin ikinci adımı başarısız olursa önceki config ve marker geri yüklenir.
+- Marker yalnızca geçerli şema, committed durumu ve SHA-256 alanları doğrulandıktan sonra importu bastırabilir. Bilinçli yeniden import: `/twiopsec import`.
+- Başarılı configler `config.last-known-good.yml` olarak atomik saklanır. Hatalı reload çalışan ayarları değiştirmez; hatalı açılış configi varsa doğrulanmış son kopya kullanılabilir.
 - T2CodeLib config'i yalnızca geri dönüş/arşiv amacıyla migration yedeğine eklenir; eski T2CodeLib Java API'sine binary uyumluluk sunulmaz.
 
 Üretim verisi ve yerel sunucu yolları depoya veya JAR'a dahil edilmez. Gerçek kaynak yalnızca yerel, izole test kopyasında kullanılmıştır.
@@ -78,7 +80,7 @@ Gerçek T2C dosyalarının geçici kopyasıyla import regresyon testi:
 .\gradlew.bat clean test jar -PlegacyT2Dir='D:\path\to\plugins\T2C-OPSecurity'
 ```
 
-Derleme çıktısı `build/libs/TwiOpSec-1.1.0.jar` olur. Projede CI/CD tanımı bilinçli olarak yoktur; doğrulama ve yayın yerel kalite kapılarıyla yapılır.
+Derleme çıktısı `build/libs/TwiOpSec-1.1.1.jar` olur. Projede CI/CD tanımı bilinçli olarak yoktur; doğrulama ve yayın yerel kalite kapılarıyla yapılır.
 
 ## Sınırlar ve kaynaklar
 

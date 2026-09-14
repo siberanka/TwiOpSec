@@ -14,6 +14,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -82,7 +83,7 @@ class LegacyImporterTest {
         }, Clock.fixed(Instant.parse("2026-09-14T12:00:00Z"), ZoneOffset.UTC));
         ImportReport report = importer.importLegacy("T2C-OPSecurity", false);
 
-        assertEquals(ImportReport.Status.IMPORTED, report.status());
+        assertEquals(ImportReport.Status.IMPORTED, report.status(), report.detail());
         assertEquals(1, report.operators());
         assertEquals(1, report.permissionHolders());
         YamlConfiguration output = YamlConfiguration.loadConfiguration(target.resolve("config.yml").toFile());
@@ -96,9 +97,12 @@ class LegacyImporterTest {
         assertEquals("12345678-1234-1234-1234-1234567890ab",
                 output.getString("trusted.operators.identity-1.uuid"));
         assertTrue(Files.isRegularFile(target.resolve("migration-v1.yml")));
-        assertTrue(Files.isRegularFile(target.resolve("migration-backups/20260914-120000/opWhitelist.yml")));
+        assertTrue(Files.isRegularFile(target.resolve("migration-backups/20260914-120000.000/opWhitelist.yml")));
         assertEquals(ImportReport.Status.ALREADY_IMPORTED,
                 importer.importLegacy("T2C-OPSecurity", false).status());
+        assertEquals(ImportReport.Status.IMPORTED,
+                importer.importLegacy("T2C-OPSecurity", true).status());
+        assertTrue(Files.isRegularFile(target.resolve("migration-backups/20260914-120000.000-1/opWhitelist.yml")));
     }
 
     @Test
@@ -119,6 +123,46 @@ class LegacyImporterTest {
         assertEquals(java.util.HexFormat.of().formatHex(before),
                 java.util.HexFormat.of().formatHex(Files.readAllBytes(target.resolve("config.yml"))));
         assertFalse(Files.exists(target.resolve("migration-v1.yml")));
+    }
+
+    @Test
+    void malformedYamlCannotCommitAnEmptyWhitelistOrMarker() throws IOException {
+        Path plugins = temporary.resolve("plugins");
+        Path source = plugins.resolve("T2C-OPSecurity");
+        Path target = plugins.resolve("TwiOpSec");
+        Files.createDirectories(source);
+        copyDefaultConfig(target);
+        write(source.resolve("config.yml"), "check: {}\n");
+        write(source.resolve("opWhitelist.yml"), "opWhitelist:\n  whitelist: [\n");
+        write(source.resolve("permissionWhitelist.yml"), "permissionWhitelist: {}\n");
+        byte[] before = Files.readAllBytes(target.resolve("config.yml"));
+
+        ImportReport report = new LegacyImporter(target, plugins, ignored -> {
+        }).importLegacy("T2C-OPSecurity", false);
+
+        assertEquals(ImportReport.Status.FAILED, report.status());
+        assertArrayEquals(before, Files.readAllBytes(target.resolve("config.yml")));
+        assertFalse(Files.exists(target.resolve("migration-v1.yml")));
+    }
+
+    @Test
+    void corruptMarkerCannotSilentlySuppressImport() throws IOException {
+        Path plugins = temporary.resolve("plugins");
+        Path source = plugins.resolve("T2C-OPSecurity");
+        Path target = plugins.resolve("TwiOpSec");
+        Files.createDirectories(source);
+        copyDefaultConfig(target);
+        write(target.resolve("migration-v1.yml"), "status: committed\nsource-sha256: {}\n");
+        write(source.resolve("config.yml"), "check: {}\n");
+        write(source.resolve("opWhitelist.yml"), "opWhitelist: {}\n");
+        write(source.resolve("permissionWhitelist.yml"), "permissionWhitelist: {}\n");
+        byte[] before = Files.readAllBytes(target.resolve("config.yml"));
+
+        ImportReport report = new LegacyImporter(target, plugins, ignored -> {
+        }).importLegacy("T2C-OPSecurity", false);
+
+        assertEquals(ImportReport.Status.FAILED, report.status());
+        assertArrayEquals(before, Files.readAllBytes(target.resolve("config.yml")));
     }
 
     private static void copyDefaultConfig(Path target) throws IOException {

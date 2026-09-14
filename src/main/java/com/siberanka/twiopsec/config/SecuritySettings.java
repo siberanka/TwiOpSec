@@ -56,7 +56,10 @@ public record SecuritySettings(
     }
 
     public boolean isTrustedPermissionHolder(UUID uuid) {
-        return uuid != null && trustedPermissionHolders.containsKey(uuid);
+        // A trusted operator is already authorized for the server's broadest privilege set.
+        // Requiring the same UUID in both maps creates an unsafe configuration footgun where
+        // an explicitly trusted operator is immediately kicked for inherited OP permissions.
+        return uuid != null && (trustedOperators.containsKey(uuid) || trustedPermissionHolders.containsKey(uuid));
     }
 
     public TrustedIdentity operatorByName(String name) {

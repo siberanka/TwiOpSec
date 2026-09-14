@@ -30,8 +30,9 @@ protected-permissions:
   - "luckperms.*"
   - "twiopsec.admin"
 
-# Permission-management command roots. Untrusted players and command blocks are
-# denied; the local/remote console remains allowed. Add aliases used by your server.
+# Permission-management command roots. The five defaults remain active even if
+# this list is emptied. Untrusted players and command blocks are denied; the
+# local/remote console remains allowed. Add aliases used by your server.
 privilege-command-roots:
   - "lp"
   - "luckperms"
@@ -49,6 +50,7 @@ legacy-import:
   preserve-default-permissions: true
 
 hardening:
+  # This compatibility key cannot disable the invariant; false is ignored with a warning.
   block-runtime-unload-commands: true
   # Add the command root of any runtime plugin manager installed on the server.
   # Built-in known roots are always retained when this list is edited.
@@ -66,4 +68,5 @@ hardening:
     - "pm"
     - "pman"
   audit-log: true
+  # The queue is bounded to 128..65536. Audit files rotate at 16 MiB and keep five archives.
   audit-queue-capacity: 2048

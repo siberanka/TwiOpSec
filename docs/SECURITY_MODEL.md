@@ -15,6 +15,8 @@ The local server console is the only principal allowed to execute TwiOpSec's own
 5. Entity mutation runs through that player's Folia entity scheduler; cross-player enumeration uses the global scheduler.
 6. Audit input is bounded and control/newline characters are encoded or removed.
 7. Server `stop` remains available and does not create unexpected-disable evidence.
+8. Bukkit `commands.yml` aliases cannot hide protected command roots; malformed alias data fails startup closed.
+9. Persistent operator entries are reconciled against the UUID allowlist on startup using the global scheduler.
 
 ## Defensive controls
 
@@ -23,6 +25,7 @@ The local server console is the only principal allowed to execute TwiOpSec's own
 - Import creates backup copies, hashes inputs, atomically replaces the target configuration, and writes its commit marker last.
 - Enforcement command templates are length/count bounded and reject embedded newlines.
 - Settings are immutable snapshots exchanged atomically; reload does not mutate a live configuration object.
+- Server aliases are read through the same bounded strict YAML path and expanded with Bukkit-compatible argument rules, recursion and command-count bounds.
 - Audit uses a bounded queue to prevent unbounded memory growth.
 - The plugin has no telemetry, database, NMS, reflection, native code, shaded runtime library, or outbound network path.
 

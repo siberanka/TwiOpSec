@@ -1,10 +1,12 @@
+import org.gradle.external.javadoc.StandardJavadocDocletOptions
+
 plugins {
     java
     jacoco
 }
 
 group = "com.siberanka.twiopsec"
-version = "1.1.0"
+version = "1.1.1"
 val pluginVersion = version.toString()
 
 repositories {
@@ -31,6 +33,11 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.release.set(25)
     options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
+}
+
+tasks.withType<Javadoc>().configureEach {
+    isFailOnError = true
+    (options as StandardJavadocDocletOptions).addBooleanOption("Xdoclint:all,-missing", true)
 }
 
 tasks.processResources {

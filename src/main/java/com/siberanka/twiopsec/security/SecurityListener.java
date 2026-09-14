@@ -48,8 +48,9 @@ public final class SecurityListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onInteract(PlayerInteractEvent event) {
-        if (settings.get().checkOnInteract()) {
-            engine.checkPlayer(event.getPlayer(), CheckTrigger.INTERACT);
+        if (settings.get().checkOnInteract()
+                && engine.checkPlayer(event.getPlayer(), CheckTrigger.INTERACT)) {
+            event.setCancelled(true);
         }
     }
 
@@ -61,8 +62,19 @@ public final class SecurityListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPlayerCommandEarly(PlayerCommandPreprocessEvent event) {
+        inspectPlayerCommand(event);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
+    public void onPlayerCommandFinal(PlayerCommandPreprocessEvent event) {
+        if (!event.isCancelled()) {
+            inspectPlayerCommand(event);
+        }
+    }
+
+    private void inspectPlayerCommand(PlayerCommandPreprocessEvent event) {
         if (settings.get().checkOnCommand() && engine.checkPlayer(event.getPlayer(), CheckTrigger.COMMAND)) {
             event.setCancelled(true);
             return;
@@ -73,8 +85,19 @@ public final class SecurityListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onServerCommandEarly(ServerCommandEvent event) {
+        inspectServerCommand(event);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onServerCommand(ServerCommandEvent event) {
+    public void onServerCommandFinal(ServerCommandEvent event) {
+        if (!event.isCancelled()) {
+            inspectServerCommand(event);
+        }
+    }
+
+    private void inspectServerCommand(ServerCommandEvent event) {
         if (commandGuard.inspect(event.getSender(), event.getCommand()) != CommandGuard.Decision.ALLOW) {
             event.setCancelled(true);
             event.getSender().sendMessage(DENIED);

@@ -45,6 +45,38 @@ public final class SecurityEngine {
                 plugin, ignored -> sweepOnlinePlayers(), ticks, ticks);
     }
 
+    /** Removes stale unauthorized entries already persisted in the server operator registry. */
+    public void reconcileStoredOperators() {
+        plugin.getServer().getGlobalRegionScheduler().execute(plugin, () -> {
+            SecuritySettings snapshot = settings.get();
+            if (!snapshot.enabled() || !snapshot.deopUnauthorized()) {
+                return;
+            }
+            int removed = 0;
+            for (OfflinePlayer operator : Bukkit.getOperators()) {
+                UUID uuid = operator.getUniqueId();
+                if (!snapshot.isTrustedOperator(uuid)) {
+                    try {
+                        operator.setOp(false);
+                        removed++;
+                        AuditLogger logger = audit.get();
+                        if (logger != null) {
+                            logger.record("unauthorized-stored-operator", safeOfflinePlayer(operator),
+                                    uuid.toString(), "trigger=startup-registry-reconciliation");
+                        }
+                    } catch (RuntimeException exception) {
+                        plugin.getLogger().log(Level.SEVERE,
+                                "Could not remove an unauthorized stored operator entry", exception);
+                    }
+                }
+            }
+            if (removed > 0) {
+                plugin.getLogger().warning("Removed " + removed
+                        + " unauthorized entries from the stored operator registry.");
+            }
+        });
+    }
+
     public void stop() {
         ScheduledTask current = periodicTask;
         periodicTask = null;
@@ -126,7 +158,8 @@ public final class SecurityEngine {
             }
         }
         for (PermissionAttachmentInfo info : player.getEffectivePermissions()) {
-            if (!info.getValue() || isGrantedToNonOperatorsByDefault(info.getPermission())) {
+            if (!info.getValue() || (info.getAttachment() == null
+                    && isGrantedToNonOperatorsByDefault(info.getPermission()))) {
                 continue;
             }
             for (PermissionPattern pattern : snapshot.protectedPermissions()) {
@@ -177,6 +210,11 @@ public final class SecurityEngine {
     private static String safePlayer(Player player) {
         String name = player.getName();
         return name.matches("[A-Za-z0-9_]{1,16}") ? name : player.getUniqueId().toString();
+    }
+
+    private static String safeOfflinePlayer(OfflinePlayer player) {
+        String name = player.getName();
+        return name != null && name.matches("[A-Za-z0-9_]{1,16}") ? name : player.getUniqueId().toString();
     }
 
     private static String safePermission(String permission) {

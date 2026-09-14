@@ -29,9 +29,13 @@ public final class PermissionPattern {
         if (star >= 0 && (star != normalized.length() - 1 || !normalized.endsWith(".*"))) {
             throw new IllegalArgumentException("Only a trailing .* wildcard is supported: " + raw);
         }
+        String node = star < 0 ? normalized : normalized.substring(0, normalized.length() - 2);
+        if (!node.matches("[a-z0-9_:-]+(?:\\.[a-z0-9_:-]+)*")) {
+            throw new IllegalArgumentException("Permission pattern contains an invalid node: " + raw);
+        }
         return star < 0
                 ? new PermissionPattern(normalized, false, false)
-                : new PermissionPattern(normalized.substring(0, normalized.length() - 1), true, false);
+                : new PermissionPattern(node + '.', true, false);
     }
 
     public boolean matches(String permission) {

@@ -44,8 +44,12 @@ public final class TwiOpSecCommand implements BasicCommand {
         switch (action) {
             case "status" -> status(sender);
             case "reload" -> {
-                plugin.reloadSecuritySettings();
-                sender.sendMessage(Component.text("TwiOpSec configuration reloaded."));
+                if (plugin.reloadSecuritySettings()) {
+                    sender.sendMessage(Component.text("TwiOpSec configuration reloaded."));
+                } else {
+                    sender.sendMessage(Component.text("TwiOpSec rejected the configuration; active settings are unchanged.")
+                            .color(NamedTextColor.RED));
+                }
             }
             case "import" -> {
                 ImportReport report = plugin.importLegacy(true);
@@ -68,7 +72,9 @@ public final class TwiOpSecCommand implements BasicCommand {
                 + ": enabled=" + snapshot.enabled() + ", trusted-operators="
                 + snapshot.trustedOperators().size() + ", trusted-permission-holders="
                 + snapshot.trustedPermissionHolders().size() + ", protected-permissions="
-                + snapshot.protectedPermissions().size() + "."));
+                + snapshot.protectedPermissions().size() + ", config-source="
+                + (plugin.usingLastKnownGood() ? "last-known-good" : "primary")
+                + ", audit=" + plugin.auditHealth() + "."));
     }
 
     private void runCheck(CommandSender sender) {
