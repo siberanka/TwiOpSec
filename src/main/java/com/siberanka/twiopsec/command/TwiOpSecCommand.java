@@ -74,7 +74,7 @@ public final class TwiOpSecCommand implements BasicCommand {
                 + snapshot.trustedPermissionHolders().size() + ", protected-permissions="
                 + snapshot.protectedPermissions().size() + ", config-source="
                 + (plugin.usingLastKnownGood() ? "last-known-good" : "primary")
-                + ", audit=" + plugin.auditHealth() + "."));
+                + ", audit=" + plugin.auditHealth() + ", update=" + plugin.updateHealth() + "."));
     }
 
     private void runCheck(CommandSender sender) {

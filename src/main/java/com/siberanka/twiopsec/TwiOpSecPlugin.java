@@ -10,6 +10,9 @@ import com.siberanka.twiopsec.security.AuditLogger;
 import com.siberanka.twiopsec.security.CommandGuard;
 import com.siberanka.twiopsec.security.SecurityEngine;
 import com.siberanka.twiopsec.security.SecurityListener;
+import com.siberanka.twiopsec.update.UpdateChecker;
+import com.siberanka.twiopsec.update.UpdateNotice;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -24,13 +27,19 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Map;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
 public final class TwiOpSecPlugin extends JavaPlugin {
     private final AtomicReference<SecuritySettings> settings = new AtomicReference<>();
     private final AtomicReference<AuditLogger> audit = new AtomicReference<>();
+    private final AtomicReference<UpdateChecker.Result> updateStatus =
+            new AtomicReference<>(UpdateChecker.Result.disabled("unknown"));
+    private final UpdateNotice updateNotice = new UpdateNotice();
+    private final AtomicLong updateGeneration = new AtomicLong();
     private final AtomicBoolean unexpectedDisableMarked = new AtomicBoolean();
     private final AtomicBoolean commandsRegistered = new AtomicBoolean();
     private SecurityEngine engine;
@@ -39,6 +48,7 @@ public final class TwiOpSecPlugin extends JavaPlugin {
     private volatile String legacySourceFolder = "T2C-OPSecurity";
     private volatile boolean usingLastKnownGood;
     private volatile boolean startupComplete;
+    private volatile ScheduledTask updateTask;
 
     @Override
     public void onEnable() {
@@ -90,6 +100,7 @@ public final class TwiOpSecPlugin extends JavaPlugin {
         engine.reconcileStoredOperators();
         engine.restartPeriodicTask();
         startupComplete = true;
+        startUpdateCheck(securitySettings);
 
         getLogger().info("TwiOpSec enabled with " + securitySettings.trustedOperators().size()
                 + " trusted operators and " + securitySettings.protectedPermissions().size()
@@ -144,6 +155,11 @@ public final class TwiOpSecPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        updateGeneration.incrementAndGet();
+        ScheduledTask currentUpdateTask = updateTask;
+        if (currentUpdateTask != null) {
+            currentUpdateTask.cancel();
+        }
         if (engine != null) {
             engine.stop();
         }
@@ -183,6 +199,7 @@ public final class TwiOpSecPlugin extends JavaPlugin {
         usingLastKnownGood = false;
         engine.restartPeriodicTask();
         refreshPlayerCommandTrees();
+        startUpdateCheck(replacementSettings);
         return true;
     }
 
@@ -211,6 +228,84 @@ public final class TwiOpSecPlugin extends JavaPlugin {
         }
         return logger.isHealthy() ? "healthy,dropped=" + logger.droppedEvents()
                 : "degraded,dropped=" + logger.droppedEvents() + ",error=" + logger.lastFailure();
+    }
+
+    public String updateHealth() {
+        return updateStatus.get().health();
+    }
+
+    public void notifyAvailableUpdate(Player player) {
+        UpdateChecker.Result result = updateStatus.get();
+        SecuritySettings snapshot = settings.get();
+        if (snapshot == null || !updateNotice.claim(player, snapshot, result)) {
+            return;
+        }
+        player.sendMessage(updateNotice.message(result));
+    }
+
+    public void clearUpdateNotification(UUID uuid) {
+        updateNotice.clear(uuid);
+    }
+
+    private synchronized void startUpdateCheck(SecuritySettings snapshot) {
+        long generation = updateGeneration.incrementAndGet();
+        ScheduledTask current = updateTask;
+        if (current != null) {
+            current.cancel();
+        }
+        updateNotice.clearAll();
+        String currentVersion = getPluginMeta().getVersion();
+        if (!snapshot.updateCheckEnabled()) {
+            updateStatus.set(UpdateChecker.Result.disabled(currentVersion));
+            updateTask = null;
+            return;
+        }
+
+        updateStatus.set(UpdateChecker.Result.checking(currentVersion));
+        try {
+            UpdateChecker checker = new UpdateChecker(currentVersion, snapshot.updateConnectTimeoutSeconds(),
+                    snapshot.updateRequestTimeoutSeconds());
+            updateTask = getServer().getAsyncScheduler().runNow(this, ignored -> {
+                UpdateChecker.Result result = checker.check();
+                if (generation != updateGeneration.get() || !isEnabled() || Bukkit.isStopping()) {
+                    return;
+                }
+                updateStatus.set(result);
+                announceUpdateResult(result);
+            });
+        } catch (RuntimeException exception) {
+            updateStatus.set(UpdateChecker.Result.unavailable(currentVersion, "scheduler-unavailable"));
+            getLogger().warning("Update check could not be scheduled; server security enforcement is unaffected.");
+        }
+    }
+
+    private void announceUpdateResult(UpdateChecker.Result result) {
+        switch (result.status()) {
+            case AVAILABLE -> {
+                getLogger().warning("TwiOpSec " + result.latestVersion() + " is available from "
+                        + result.source().name() + ": " + result.releaseUri());
+                try {
+                    getServer().getGlobalRegionScheduler().execute(this, () -> {
+                        if (!isEnabled() || Bukkit.isStopping()
+                                || updateStatus.get() != result) {
+                            return;
+                        }
+                        for (Player player : Bukkit.getOnlinePlayers()) {
+                            player.getScheduler().execute(this, () -> notifyAvailableUpdate(player), null, 1L);
+                        }
+                    });
+                } catch (IllegalStateException ignored) {
+                    // Shutdown raced the completed metadata request; no notice is needed.
+                }
+            }
+            case UP_TO_DATE -> getLogger().info("TwiOpSec update check completed via "
+                    + result.source().name() + "; this build is current.");
+            case UNAVAILABLE -> getLogger().warning("TwiOpSec update check was unavailable ("
+                    + result.detail() + "); server security enforcement is unaffected.");
+            case DISABLED, CHECKING -> {
+                // These states are not completion results.
+            }
+        }
     }
 
     public void markUnexpectedDisable(String reason) {

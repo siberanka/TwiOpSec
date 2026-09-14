@@ -28,6 +28,7 @@ Folia satırındaki `beta`, TwiOpSec'in değil test edilen resmî Folia sunucu y
 - Paper eklenti classloader izolasyonu kullanılır; JAR içinde legacy `plugin.yml` bulunmaz.
 - Sunucunun gerçek `stop` akışı engellenmez. Beklenmeyen disable sonraki açılış için kanıt işareti bırakır.
 - Audit yazımı sınırlı kuyrukta ayrı bir iş parçacığında yapılır; I/O hatasında yeniden denenir, 16 MiB'de döner ve beş arşiv saklar.
+- Güncelleme kontrolü ana kaynak olarak sabit HTTPS GitHub sürüm adresini kullanır. Yalnızca bu kaynak erişilemez veya doğrulanamazsa sabit GitLab yedeğine geçer; otomatik JAR indirme ya da çalıştırma yapmaz. Yeni sürüm, açılışta konsola ve oyuna her girişlerinde yalnızca aktif `trusted.operators` OP'larına doğrulanmış, tıklanabilir sürüm bağlantısıyla bildirilir.
 
 Varsayılan korunan düğümler şunlardır ve import sırasında silinmez: `*`, `minecraft.*`, `minecraft.command.*`, `minecraft.command.op`, `bukkit.command.*`, `paper.command.*`, `essentials.*`, `luckperms.*`, `twiopsec.admin`.
 
@@ -35,7 +36,7 @@ Varsayılan korunan düğümler şunlardır ve import sırasında silinmez: `*`,
 
 ## Kurulum ve T2C importu
 
-1. Sunucuyu durdurun ve `plugins/TwiOpSec-1.1.1.jar` dosyasını yerleştirin.
+1. Sunucuyu durdurun ve `plugins/TwiOpSec-1.2.0.jar` dosyasını yerleştirin.
 2. Eski `plugins/T2C-OPSecurity/` klasörünü ilk açılışta yerinde bırakın.
 3. Sunucuyu başlatın. TwiOpSec, `config.yml`, `opWhitelist.yml` ve `permissionWhitelist.yml` dosyalarının tamamını güvenli biçimde okuyamazsa importu commit etmez. Geçerli son ayar yoksa fail-closed olarak sunucuyu durdurur.
 4. Logdaki import sayılarını kontrol edin ve `plugins/TwiOpSec/config.yml` içindeki iki güven listesini gözden geçirin.
@@ -80,7 +81,7 @@ Gerçek T2C dosyalarının geçici kopyasıyla import regresyon testi:
 .\gradlew.bat clean test jar -PlegacyT2Dir='D:\path\to\plugins\T2C-OPSecurity'
 ```
 
-Derleme çıktısı `build/libs/TwiOpSec-1.1.1.jar` olur. Projede CI/CD tanımı bilinçli olarak yoktur; doğrulama ve yayın yerel kalite kapılarıyla yapılır.
+Derleme çıktısı `build/libs/TwiOpSec-1.2.0.jar` olur. Projede CI/CD tanımı bilinçli olarak yoktur; doğrulama ve yayın yerel kalite kapılarıyla yapılır.
 
 ## Sınırlar ve kaynaklar
 

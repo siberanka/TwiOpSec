@@ -49,6 +49,14 @@ legacy-import:
   source-folder: "T2C-OPSecurity"
   preserve-default-permissions: true
 
+updates:
+  # Checks only fixed HTTPS release endpoints. GitHub is authoritative; GitLab is
+  # contacted only when GitHub is unreachable or returns an invalid response.
+  # TwiOpSec never downloads or executes an update automatically.
+  enabled: true
+  connect-timeout-seconds: 5
+  request-timeout-seconds: 5
+
 hardening:
   # This compatibility key cannot disable the invariant; false is ignored with a warning.
   block-runtime-unload-commands: true

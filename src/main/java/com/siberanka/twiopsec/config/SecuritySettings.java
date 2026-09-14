@@ -32,7 +32,10 @@ public record SecuritySettings(
         boolean blockRuntimeUnloadCommands,
         Set<String> runtimePluginManagerRoots,
         boolean auditLog,
-        int auditQueueCapacity
+        int auditQueueCapacity,
+        boolean updateCheckEnabled,
+        int updateConnectTimeoutSeconds,
+        int updateRequestTimeoutSeconds
 ) {
     public SecuritySettings {
         kickMessage = safeText(kickMessage, 512, "TwiOpSec: unauthorized elevated access.");
@@ -49,6 +52,8 @@ public record SecuritySettings(
                 .collect(Collectors.toUnmodifiableSet());
         periodicSeconds = Math.max(1, Math.min(periodicSeconds, 3600));
         auditQueueCapacity = Math.max(128, Math.min(auditQueueCapacity, 65_536));
+        updateConnectTimeoutSeconds = Math.max(2, Math.min(updateConnectTimeoutSeconds, 15));
+        updateRequestTimeoutSeconds = Math.max(2, Math.min(updateRequestTimeoutSeconds, 15));
     }
 
     public boolean isTrustedOperator(UUID uuid) {

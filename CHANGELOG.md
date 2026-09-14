@@ -2,6 +2,14 @@
 
 All notable changes use Semantic Versioning.
 
+## 1.2.0 - 2026-09-14
+
+- Added an asynchronous, bounded startup update check with GitHub as the authoritative source and GitLab as failure-only fallback.
+- Restricted accepted release links to exact HTTPS hosts, ports, repository paths and stable Semantic Version tags; redirects are never followed automatically.
+- Added console startup notices and clickable join notices only for active operators whose UUID is trusted.
+- Added update state to the console status command and safe timeout/disable settings.
+- Added regression coverage for fallback priority, malicious redirects, source pinning and version ordering.
+
 ## 1.1.1 - 2026-09-14
 
 - Closed nested `execute`/dispatch command bypasses for OP targets, privilege roots and runtime reload/unload commands.

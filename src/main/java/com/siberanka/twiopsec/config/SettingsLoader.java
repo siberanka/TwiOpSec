@@ -57,7 +57,7 @@ public final class SettingsLoader {
 
     private static LoadedConfiguration parse(YamlConfiguration yaml, Consumer<String> warning, String sourceText)
             throws IOException {
-        for (String section : List.of("enforcement", "trusted", "legacy-import", "hardening")) {
+        for (String section : List.of("enforcement", "trusted", "legacy-import", "hardening", "updates")) {
             requireOptionalSection(yaml, section);
         }
         int schema = integer(yaml, "schema-version", SCHEMA_VERSION);
@@ -142,7 +142,10 @@ public final class SettingsLoader {
                 blockRuntimeUnload,
                 pluginManagerRoots,
                 bool(yaml, "hardening.audit-log", true),
-                boundedInteger(yaml, "hardening.audit-queue-capacity", 2048, 128, 65_536)
+                boundedInteger(yaml, "hardening.audit-queue-capacity", 2048, 128, 65_536),
+                bool(yaml, "updates.enabled", true),
+                boundedInteger(yaml, "updates.connect-timeout-seconds", 5, 2, 15),
+                boundedInteger(yaml, "updates.request-timeout-seconds", 5, 2, 15)
         );
 
         boolean automatic = bool(yaml, "legacy-import.automatic", true);

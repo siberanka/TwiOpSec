@@ -29,6 +29,9 @@ class SettingsLoaderHardeningTest {
         assertRejected("schema-version: 1\ntrusted:\n  operators:\n    owner:\n      name: Owner_1\n      uuid: 42\n");
         assertRejected("schema-version: 1\nenforcement:\n  periodic-seconds: 0\n");
         assertRejected("schema-version: 1\nhardening:\n  audit-queue-capacity: 65537\n");
+        assertRejected("schema-version: 1\nupdates:\n  enabled: 'yes'\n");
+        assertRejected("schema-version: 1\nupdates:\n  connect-timeout-seconds: 1\n");
+        assertRejected("schema-version: 1\nupdates:\n  request-timeout-seconds: 16\n");
     }
 
     @Test

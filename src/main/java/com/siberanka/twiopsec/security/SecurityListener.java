@@ -12,6 +12,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.ServerCommandEvent;
 
@@ -34,10 +35,17 @@ public final class SecurityListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(PlayerJoinEvent event) {
-        if (settings.get().checkOnJoin()) {
-            event.getPlayer().getScheduler().execute(plugin,
-                    () -> engine.checkPlayer(event.getPlayer(), CheckTrigger.JOIN), null, 1L);
-        }
+        event.getPlayer().getScheduler().execute(plugin, () -> {
+            if (settings.get().checkOnJoin()) {
+                engine.checkPlayer(event.getPlayer(), CheckTrigger.JOIN);
+            }
+            plugin.notifyAvailableUpdate(event.getPlayer());
+        }, null, 1L);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onQuit(PlayerQuitEvent event) {
+        plugin.clearUpdateNotification(event.getPlayer().getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
