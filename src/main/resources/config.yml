@@ -1,0 +1,54 @@
+# TwiOpSec configuration. Identity decisions use UUIDs; names are informational.
+schema-version: 1
+
+enforcement:
+  enabled: true
+  check-on-join: true
+  check-on-command: true
+  check-on-interact: true
+  check-on-chat: true
+  periodic-enabled: true
+  periodic-seconds: 2
+  require-online-op-target: true
+  deop-unauthorized: true
+  kick-unauthorized-operator: true
+  kick-unauthorized-permission: true
+  kick-message: "TwiOpSec: this account is not authorized for elevated access."
+  unauthorized-operator-commands: []
+  unauthorized-permission-commands: []
+
+# Defaults are always unioned with imported T2C permissions and cannot disappear
+# merely because an older configuration is imported.
+protected-permissions:
+  - "*"
+  - "minecraft.*"
+  - "minecraft.command.*"
+  - "minecraft.command.op"
+  - "bukkit.command.*"
+  - "paper.command.*"
+  - "essentials.*"
+  - "luckperms.*"
+  - "twiopsec.admin"
+
+# Permission-management command roots. Untrusted players and command blocks are
+# denied; the local/remote console remains allowed. Add aliases used by your server.
+privilege-command-roots:
+  - "lp"
+  - "luckperms"
+  - "lpb"
+  - "permissions"
+  - "pex"
+
+trusted:
+  operators: {}
+  permission-holders: {}
+
+legacy-import:
+  automatic: true
+  source-folder: "T2C-OPSecurity"
+  preserve-default-permissions: true
+
+hardening:
+  block-runtime-unload-commands: true
+  audit-log: true
+  audit-queue-capacity: 2048

@@ -1,0 +1,21 @@
+name: TwiOpSec
+version: '${version}'
+main: com.siberanka.twiopsec.TwiOpSecPlugin
+description: Fail-closed operator and privileged-permission protection for Paper and Folia.
+author: siberanka
+website: https://gitlab.com/siberanka/TwiOpSec
+api-version: '26.2'
+folia-supported: true
+load: STARTUP
+commands:
+  twiopsec:
+    description: Inspect and administer TwiOpSec.
+    usage: /twiopsec <status|reload|import|check>
+    aliases: [twios, opsec]
+permissions:
+  twiopsec.admin:
+    description: Allows TwiOpSec administration when the sender is also trusted.
+    default: op
+  twiopsec.notify:
+    description: Receives local enforcement alerts.
+    default: op
