@@ -29,6 +29,9 @@ permission-remediation:
   vault-fallback: true
   bukkit-attachment-fallback: true
 
+# Entries are exact permission nodes. Therefore `essentials.*` protects the real
+# wildcard grant but does not match `essentials.warps.end`. Use `example.admin.**`
+# only when every descendant below `example.admin.` must deliberately be protected.
 # Defaults are always unioned with imported T2C permissions and cannot disappear
 # merely because an older configuration is imported.
 protected-permissions:

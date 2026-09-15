@@ -33,7 +33,7 @@ Folia satırındaki `beta`, TwiOpSec'in değil test edilen resmî Folia sunucu y
 
 Varsayılan korunan düğümler şunlardır ve import sırasında silinmez: `*`, `minecraft.*`, `minecraft.command.*`, `minecraft.command.op`, `bukkit.command.*`, `paper.command.*`, `essentials.*`, `luckperms.*`, `twiopsec.admin`.
 
-`*` burada bütün izinlerle eşleşen bir glob değil, izin sistemindeki gerçek kök `*` düğümüdür. Böylece yalnızca OP olduğu için varsayılan gelen zararsız izinler bütün oyuncuları yanlışlıkla cezalandırmaz.
+`*` burada bütün izinlerle eşleşen bir glob değil, izin sistemindeki gerçek kök `*` düğümüdür. Aynı şekilde `essentials.*` yalnız gerçek wildcard izin düğümünü korur; `essentials.warps.end` gibi normal alt izinleri kapsamaz. Bir alt ağacın tamamını bilinçli olarak korumak için açık `.**` biçimi kullanılır: `example.admin.**`. Böylece yalnızca OP olduğu için varsayılan gelen veya oyunculara açıkça verilmiş zararsız izinler yanlışlıkla cezalandırılmaz.
 
 ## Citizens sunucu NPC uyumluluğu
 
@@ -49,7 +49,7 @@ Citizens yoksa veya kapalıysa ayar fail-closed kalır ve konsola uyarı yazar. 
 
 ## Kurulum ve T2C importu
 
-1. Sunucuyu durdurun ve `plugins/TwiOpSec-1.3.0.jar` dosyasını yerleştirin.
+1. Sunucuyu durdurun ve `plugins/TwiOpSec-1.3.1.jar` dosyasını yerleştirin.
 2. Eski `plugins/T2C-OPSecurity/` klasörünü ilk açılışta yerinde bırakın.
 3. Sunucuyu başlatın. TwiOpSec, `config.yml`, `opWhitelist.yml` ve `permissionWhitelist.yml` dosyalarının tamamını güvenli biçimde okuyamazsa importu commit etmez. Geçerli son ayar yoksa fail-closed olarak sunucuyu durdurur.
 4. Logdaki import sayılarını kontrol edin ve `plugins/TwiOpSec/config.yml` içindeki iki güven listesini gözden geçirin.
@@ -94,13 +94,13 @@ Gerçek T2C dosyalarının geçici kopyasıyla import regresyon testi:
 .\gradlew.bat clean test jar -PlegacyT2Dir='D:\path\to\plugins\T2C-OPSecurity'
 ```
 
-Derleme çıktısı `build/libs/TwiOpSec-1.3.0.jar` olur. Projede CI/CD tanımı bilinçli olarak yoktur; doğrulama ve yayın yerel kalite kapılarıyla yapılır.
+Derleme çıktısı `build/libs/TwiOpSec-1.3.1.jar` olur. Projede CI/CD tanımı bilinçli olarak yoktur; doğrulama ve yayın yerel kalite kapılarıyla yapılır.
 
 ## Sınırlar ve kaynaklar
 
 Aynı JVM'de çalışan kötü niyetli bir eklenti güvenlik sınırının içindedir: Bukkit API'sini doğrudan çağırabilir, listener'ları kaldırabilir, TwiOpSec'i disable edebilir veya dosyalara yazabilir. Modern Paper classloader izolasyonu, genişletilmiş komut engeli ve disable kanıtı savunma katmanlarıdır; mutlak engel değildir. Eklenti allowlist'i, dosya izinleri, ayrı servis hesabı, çevrimiçi kimlik doğrulama, güncel Paper/Folia ve yalnızca güvenilir JAR'lar kullanın.
 
-Ayrıntılar için [güvenlik modeli](docs/SECURITY_MODEL.md), [test raporu](docs/TEST_REPORT.md), [upstream atfı](UPSTREAM.md) ve [güvenlik politikası](SECURITY.md) belgelerine bakın.
+Ayrıntılar için [güvenlik modeli](docs/SECURITY_MODEL.md), [temel test raporu](docs/TEST_REPORT.md), [1.3.1 düzeltme doğrulaması](docs/TEST_REPORT_1.3.1.md), [upstream atfı](UPSTREAM.md) ve [güvenlik politikası](SECURITY.md) belgelerine bakın.
 
 ## Lisans
 

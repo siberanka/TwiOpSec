@@ -6,12 +6,12 @@ import java.util.Objects;
 /** Matches permission nodes without regex, avoiding regex injection and pathological patterns. */
 public final class PermissionPattern {
     private final String value;
-    private final boolean wildcard;
+    private final boolean descendantPattern;
     private final boolean globalNode;
 
-    private PermissionPattern(String value, boolean wildcard, boolean globalNode) {
+    private PermissionPattern(String value, boolean descendantPattern, boolean globalNode) {
         this.value = value;
-        this.wildcard = wildcard;
+        this.descendantPattern = descendantPattern;
         this.globalNode = globalNode;
     }
 
@@ -25,17 +25,19 @@ public final class PermissionPattern {
         if (normalized.equals("*")) {
             return new PermissionPattern("*", false, true);
         }
-        int star = normalized.indexOf('*');
-        if (star >= 0 && (star != normalized.length() - 1 || !normalized.endsWith(".*"))) {
-            throw new IllegalArgumentException("Only a trailing .* wildcard is supported: " + raw);
+        boolean descendants = normalized.endsWith(".**");
+        String node = descendants ? normalized.substring(0, normalized.length() - 3) : normalized;
+        int star = node.indexOf('*');
+        if (star >= 0 && (!node.endsWith(".*") || star != node.length() - 1)) {
+            throw new IllegalArgumentException("Only an exact trailing .* node or explicit .** descendants are supported: " + raw);
         }
-        String node = star < 0 ? normalized : normalized.substring(0, normalized.length() - 2);
-        if (!node.matches("[a-z0-9_:-]+(?:\\.[a-z0-9_:-]+)*")) {
+        String validationNode = node.endsWith(".*") ? node.substring(0, node.length() - 2) : node;
+        if (!validationNode.matches("[a-z0-9_:-]+(?:\\.[a-z0-9_:-]+)*")) {
             throw new IllegalArgumentException("Permission pattern contains an invalid node: " + raw);
         }
-        return star < 0
-                ? new PermissionPattern(normalized, false, false)
-                : new PermissionPattern(node + '.', true, false);
+        return descendants
+                ? new PermissionPattern(node + '.', true, false)
+                : new PermissionPattern(node, false, false);
     }
 
     public boolean matches(String permission) {
@@ -43,11 +45,11 @@ public final class PermissionPattern {
             return false;
         }
         String candidate = permission.toLowerCase(Locale.ROOT);
-        return wildcard ? candidate.startsWith(value) : candidate.equals(value);
+        return descendantPattern ? candidate.startsWith(value) : candidate.equals(value);
     }
 
     public String source() {
-        return wildcard ? value + "*" : value;
+        return descendantPattern ? value + "**" : value;
     }
 
     public boolean isGlobalNode() {

@@ -79,6 +79,22 @@ class LuckPermsHookTest {
     }
 
     @Test
+    void exactWildcardProtectionDoesNotRemoveOrdinaryChildPermissions() throws IOException {
+        Fixture fixture = new Fixture(settings(false));
+        Node actualWildcardGrant = node("essentials.*", true);
+        Node purchasedWarp = node("essentials.warps.end", true);
+        fixture.user.nodes.get(DataType.NORMAL).addAll(List.of(actualWildcardGrant, purchasedWarp));
+
+        fixture.hook.onNodeAdd(event(fixture.user.target, purchasedWarp, DataType.NORMAL));
+        assertEquals(List.of(actualWildcardGrant, purchasedWarp), fixture.user.nodes.get(DataType.NORMAL));
+        assertEquals(0, fixture.userSaves.get());
+
+        fixture.hook.onNodeAdd(event(fixture.user.target, actualWildcardGrant, DataType.NORMAL));
+        assertEquals(List.of(purchasedWarp), fixture.user.nodes.get(DataType.NORMAL));
+        assertEquals(1, fixture.userSaves.get());
+    }
+
+    @Test
     void trustedUserKeepsBothDataTypesButGroupsAreNeverIdentityTrusted() throws IOException {
         Fixture fixture = new Fixture(settings(true));
         Node protectedNode = node("essentials.*", true);
@@ -102,7 +118,7 @@ class LuckPermsHookTest {
     @Test
     void loadedReconciliationRemovesBothMapsAndSavesEachEnduringHolderOnce() throws IOException {
         Fixture fixture = new Fixture(settings(false));
-        Node protectedNode = node("paper.command.reload", true);
+        Node protectedNode = node("paper.command.*", true);
         Node harmless = node("example.harmless", true);
         for (DataType type : DataType.values()) {
             fixture.user.nodes.get(type).addAll(List.of(protectedNode, harmless));

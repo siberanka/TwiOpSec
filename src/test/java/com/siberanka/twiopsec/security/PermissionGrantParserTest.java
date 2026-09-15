@@ -23,9 +23,9 @@ class PermissionGrantParserTest {
         assertAttempt("lp user BadActor permission set luckperms.* true", "BadActor", "luckperms.*", settings);
         assertAttempt("luckperms group admin permission set minecraft.command.op", "admin",
                 "minecraft.command.op", settings);
-        assertAttempt("pex user BadActor add essentials.gamemode", "BadActor", "essentials.gamemode", settings);
-        assertAttempt("manuaddp BadActor bukkit.command.plugins", "BadActor", "bukkit.command.plugins", settings);
-        assertAttempt("mangaddp admin paper.command.reload", "admin", "paper.command.reload", settings);
+        assertAttempt("pex user BadActor add essentials.*", "BadActor", "essentials.*", settings);
+        assertAttempt("manuaddp BadActor bukkit.command.*", "BadActor", "bukkit.command.*", settings);
+        assertAttempt("mangaddp admin paper.command.*", "admin", "paper.command.*", settings);
         assertAttempt("lp user remove permission set minecraft.command.op true", "remove",
                 "minecraft.command.op", settings);
         assertAttempt("lp user BadActor permission set luckperms.* true server=remove", "BadActor",
@@ -39,6 +39,7 @@ class PermissionGrantParserTest {
         assertNull(attempt("lp user BadActor permission set luckperms.* false", settings));
         assertNull(attempt("pex user BadActor remove essentials.*", settings));
         assertNull(attempt("lp user BadActor permission set example.harmless true", settings));
+        assertNull(attempt("lp user BadActor permission set essentials.warps.end true", settings));
     }
 
     private void assertAttempt(String raw, String target, String permission, SecuritySettings settings) {

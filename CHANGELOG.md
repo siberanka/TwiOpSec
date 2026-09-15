@@ -2,6 +2,12 @@
 
 All notable changes use Semantic Versioning.
 
+## 1.3.1 - 2026-09-15
+
+- Fixed protected permission matching so a configured `plugin.*` protects only that actual wildcard grant instead of deleting every ordinary child permission.
+- Added explicit `plugin.**` descendant matching for administrators who intentionally need namespace-wide protection.
+- Added regression coverage for ordinary Essentials-style child permissions, exact wildcard grants, case handling and descendant boundary matching.
+
 ## 1.3.0 - 2026-09-15
 
 - Added immediate LuckPerms node-mutation monitoring for protected user and group permissions.

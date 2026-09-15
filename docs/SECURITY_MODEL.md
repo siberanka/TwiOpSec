@@ -24,7 +24,7 @@ The local server console is the only principal allowed to execute TwiOpSec's own
 
 ## Defensive controls
 
-- No regex is used for untrusted permission patterns. Only exact nodes and a final `.*` namespace wildcard are accepted.
+- No regex is used for untrusted permission patterns. Nodes, including a terminal `.*` permission grant, are exact. Only an explicit terminal `.**` matches descendants. This prevents broad defaults such as `essentials.*` from consuming ordinary nodes such as `essentials.warps.end`.
 - Imported files must be regular files below the selected plugins folder and at most 2 MiB.
 - Import creates backup copies, hashes inputs, atomically replaces the target configuration, and writes its commit marker last.
 - Enforcement command templates are length/count bounded and reject embedded newlines.
