@@ -18,6 +18,9 @@ The local server console is the only principal allowed to execute TwiOpSec's own
 8. Bukkit `commands.yml` aliases cannot hide protected command roots; malformed alias data fails startup closed.
 9. Persistent operator entries are reconciled against the UUID allowlist on startup using the global scheduler.
 10. Update metadata is accepted only from the exact GitHub release path, or from the exact GitLab release path after a GitHub failure; no returned redirect is followed.
+11. Positive protected-permission grants are denied before known permission-manager commands execute; LuckPerms API mutations are removed from their original normal/transient map immediately. Normal changes are submitted to asynchronous persistence; transient changes are never persisted.
+12. Protected group nodes are never retained because group membership is not an identity trust boundary; trusted user UUIDs remain exempt.
+13. The optional Citizens exception applies only to enabled-Citizens-owned `NPC=true` metadata while that player NPC executes one direct `/server <target>` command. Exactly one conservative target token is required; wrappers, extra arguments, embedded commands and every other root fail closed.
 
 ## Defensive controls
 
@@ -28,7 +31,13 @@ The local server console is the only principal allowed to execute TwiOpSec's own
 - Settings are immutable snapshots exchanged atomically; reload does not mutate a live configuration object.
 - Server aliases are read through the same bounded strict YAML path and expanded with Bukkit-compatible argument rules, recursion and command-count bounds.
 - Audit uses a bounded queue to prevent unbounded memory growth.
-- The plugin has no telemetry, database, NMS, reflection, native code, or shaded runtime library. Its only outbound path is a bounded asynchronous metadata request to fixed GitHub/GitLab release endpoints; it closes the response without consuming a release body and never downloads or executes an update.
+- The plugin has no telemetry, database, NMS, native code, or shaded runtime library. Minimal reflection is used only to keep the optional Vault API absent-safe. Its only outbound path is a bounded asynchronous metadata request to fixed GitHub/GitLab release endpoints; it closes the response without consuming a release body and never downloads or executes an update.
+
+## Permission-provider boundary
+
+Permission-command targets are trusted only by canonical allowlisted UUID or by an actual online player's resolved UUID. An informational whitelist name cannot authorize an offline name grant. No group is UUID-exempt. The native LuckPerms hook reconciles loaded data on startup and configuration reload; normal and transient additions are checked separately. Reload changes the active flags without adding duplicate subscriptions.
+
+LuckPerms storage failure retains the in-memory removal, logs a fixed severe warning and records a privacy-safe audit event. Persistence is not guaranteed when the provider's storage fails; fix storage health before restarting. Vault and Bukkit attachment fallbacks are bounded best effort, not a guarantee of removing inherited/provider-owned permissions. Vault 1.7.3 is not Folia-supported and is refused by Folia itself; the native LuckPerms hook remains available without it. No third-party plugin descriptor is modified to bypass Folia's loader check.
 
 ## Update notification boundary
 

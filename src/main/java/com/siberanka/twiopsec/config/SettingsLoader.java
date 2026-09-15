@@ -24,7 +24,8 @@ public final class SettingsLoader {
             "bukkit.command.*", "paper.command.*", "essentials.*", "luckperms.*", "twiopsec.admin"
     );
     public static final Set<String> REQUIRED_PRIVILEGE_COMMAND_ROOTS = Set.of(
-            "lp", "luckperms", "lpb", "permissions", "pex"
+            "lp", "luckperms", "lpb", "permissions", "pex", "groupmanager",
+            "manuaddp", "manuaddtemp", "mangaddp", "mangaddtemp"
     );
     private static final int SCHEMA_VERSION = 1;
     private static final int MAX_PERMISSION_PATTERNS = 512;
@@ -57,7 +58,8 @@ public final class SettingsLoader {
 
     private static LoadedConfiguration parse(YamlConfiguration yaml, Consumer<String> warning, String sourceText)
             throws IOException {
-        for (String section : List.of("enforcement", "trusted", "legacy-import", "hardening", "updates")) {
+        for (String section : List.of("enforcement", "permission-remediation", "trusted", "legacy-import",
+                "hardening", "updates", "compatibility", "compatibility.citizens")) {
             requireOptionalSection(yaml, section);
         }
         int schema = integer(yaml, "schema-version", SCHEMA_VERSION);
@@ -132,6 +134,11 @@ public final class SettingsLoader {
                 deopUnauthorized,
                 bool(yaml, "enforcement.kick-unauthorized-operator", true),
                 kickUnauthorizedPermission,
+                bool(yaml, "permission-remediation.enabled", true),
+                bool(yaml, "permission-remediation.block-command-grants", true),
+                bool(yaml, "permission-remediation.luckperms-native-hook", true),
+                bool(yaml, "permission-remediation.vault-fallback", true),
+                bool(yaml, "permission-remediation.bukkit-attachment-fallback", true),
                 string(yaml, "enforcement.kick-message", "TwiOpSec: unauthorized elevated access."),
                 operatorCommands,
                 permissionCommands,
@@ -145,7 +152,8 @@ public final class SettingsLoader {
                 boundedInteger(yaml, "hardening.audit-queue-capacity", 2048, 128, 65_536),
                 bool(yaml, "updates.enabled", true),
                 boundedInteger(yaml, "updates.connect-timeout-seconds", 5, 2, 15),
-                boundedInteger(yaml, "updates.request-timeout-seconds", 5, 2, 15)
+                boundedInteger(yaml, "updates.request-timeout-seconds", 5, 2, 15),
+                bool(yaml, "compatibility.citizens.server-command-npc-bypass", false)
         );
 
         boolean automatic = bool(yaml, "legacy-import.automatic", true);

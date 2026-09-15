@@ -32,6 +32,10 @@ class SettingsLoaderHardeningTest {
         assertRejected("schema-version: 1\nupdates:\n  enabled: 'yes'\n");
         assertRejected("schema-version: 1\nupdates:\n  connect-timeout-seconds: 1\n");
         assertRejected("schema-version: 1\nupdates:\n  request-timeout-seconds: 16\n");
+        assertRejected("schema-version: 1\ncompatibility:\n  citizens: true\n");
+        assertRejected("schema-version: 1\ncompatibility:\n  citizens:\n    server-command-npc-bypass: 'yes'\n");
+        assertRejected("schema-version: 1\npermission-remediation: true\n");
+        assertRejected("schema-version: 1\npermission-remediation:\n  vault-fallback: 'yes'\n");
     }
 
     @Test

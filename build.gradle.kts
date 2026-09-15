@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.siberanka.twiopsec"
-version = "1.2.0"
+version = "1.3.0"
 val pluginVersion = version.toString()
 
 repositories {
@@ -16,11 +16,13 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.2.build.123-stable")
+    compileOnly("net.luckperms:api:5.5")
 
     testImplementation(platform("org.junit:junit-bom:5.14.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("io.papermc.paper:paper-api:26.2.build.123-stable")
+    testImplementation("net.luckperms:api:5.5")
 }
 
 java {

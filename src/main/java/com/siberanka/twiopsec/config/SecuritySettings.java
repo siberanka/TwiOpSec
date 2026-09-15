@@ -22,6 +22,11 @@ public record SecuritySettings(
         boolean deopUnauthorized,
         boolean kickUnauthorizedOperator,
         boolean kickUnauthorizedPermission,
+        boolean permissionRemediationEnabled,
+        boolean blockProtectedPermissionCommands,
+        boolean luckPermsNativeHook,
+        boolean vaultFallback,
+        boolean bukkitAttachmentFallback,
         String kickMessage,
         List<String> unauthorizedOperatorCommands,
         List<String> unauthorizedPermissionCommands,
@@ -35,7 +40,8 @@ public record SecuritySettings(
         int auditQueueCapacity,
         boolean updateCheckEnabled,
         int updateConnectTimeoutSeconds,
-        int updateRequestTimeoutSeconds
+        int updateRequestTimeoutSeconds,
+        boolean citizensServerCommandNpcBypass
 ) {
     public SecuritySettings {
         kickMessage = safeText(kickMessage, 512, "TwiOpSec: unauthorized elevated access.");
@@ -69,6 +75,30 @@ public record SecuritySettings(
 
     public TrustedIdentity operatorByName(String name) {
         return byName(trustedOperators, name);
+    }
+
+    public boolean isTrustedPermissionTarget(String value) {
+        if (value == null) {
+            return false;
+        }
+        try {
+            UUID uuid = UUID.fromString(value);
+            return uuid.toString().equalsIgnoreCase(value) && isTrustedPermissionHolder(uuid);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    public PermissionPattern protectedPattern(String permission) {
+        if (permission == null) {
+            return null;
+        }
+        for (PermissionPattern pattern : protectedPermissions) {
+            if (pattern.matches(permission)) {
+                return pattern;
+            }
+        }
+        return null;
     }
 
     private static TrustedIdentity byName(Map<UUID, TrustedIdentity> identities, String name) {

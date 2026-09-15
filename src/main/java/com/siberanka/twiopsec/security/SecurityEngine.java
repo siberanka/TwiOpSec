@@ -21,13 +21,15 @@ public final class SecurityEngine {
     private final TwiOpSecPlugin plugin;
     private final AtomicReference<SecuritySettings> settings;
     private final AtomicReference<AuditLogger> audit;
+    private final PermissionRemediator permissionRemediator;
     private volatile ScheduledTask periodicTask;
 
     public SecurityEngine(TwiOpSecPlugin plugin, AtomicReference<SecuritySettings> settings,
-                          AtomicReference<AuditLogger> audit) {
+                          AtomicReference<AuditLogger> audit, PermissionRemediator permissionRemediator) {
         this.plugin = plugin;
         this.settings = settings;
         this.audit = audit;
+        this.permissionRemediator = permissionRemediator;
     }
 
     public void restartPeriodicTask() {
@@ -97,6 +99,9 @@ public final class SecurityEngine {
         }
         String permission = protectedPermission(player, snapshot);
         if (permission != null && !snapshot.isTrustedPermissionHolder(uuid)) {
+            if (snapshot.permissionRemediationEnabled()) {
+                permissionRemediator.removeFromPlayer(player, permission, trigger);
+            }
             enforcePermissionViolation(player, trigger, permission, snapshot);
             return true;
         }
@@ -117,6 +122,16 @@ public final class SecurityEngine {
         }
         OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(name);
         return cached != null && snapshot.isTrustedOperator(cached.getUniqueId());
+    }
+
+    /** Resolves a permission grant by actual UUID, never by an informational whitelist name. */
+    public boolean mayGrantPermissionTarget(String target) {
+        SecuritySettings snapshot = settings.get();
+        if (snapshot.isTrustedPermissionTarget(target)) {
+            return true;
+        }
+        Player online = target == null ? null : Bukkit.getPlayerExact(target);
+        return online != null && snapshot.isTrustedPermissionHolder(online.getUniqueId());
     }
 
     private void sweepOnlinePlayers() {

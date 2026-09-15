@@ -2,6 +2,18 @@
 
 All notable changes use Semantic Versioning.
 
+## 1.3.0 - 2026-09-15
+
+- Added immediate LuckPerms node-mutation monitoring for protected user and group permissions.
+- Added automatic native removal and persistence of unauthorized protected nodes on add, user load, startup group reconciliation and player checks.
+- Added Vault and Bukkit attachment fallbacks for other permission providers without granting either fallback authority to remove groups blindly.
+- Blocked positive protected-permission grants through LuckPerms, PermissionsEx and GroupManager command forms before execution, including wrapped and aliased command chains.
+- Added an opt-in Citizens exception restricted to enabled-Citizens-owned `NPC=true` metadata and one direct `/server <target>` command; wrappers, extra arguments, OP, permission-manager and unload protections remain enforced.
+- Added negative tests for removal commands, false nodes, harmless permissions, metadata impersonation and non-`/server` NPC commands.
+- Reconcile normal and transient LuckPerms maps separately; persist only normal nodes and report storage failures without restoring privileges or exposing storage exceptions.
+- Reload native-hook flags without duplicate subscriptions; permission-command trust uses canonical UUIDs or an actual online player's UUID, never an informational whitelist name.
+- Remove duplicate protected grants across separate Bukkit attachments and eliminate the unused VaultAPI/JitPack build dependency.
+
 ## 1.2.0 - 2026-09-14
 
 - Added an asynchronous, bounded startup update check with GitHub as the authoritative source and GitLab as failure-only fallback.

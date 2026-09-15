@@ -53,6 +53,14 @@ public final class CommandGuard {
             return Decision.ALLOW;
         }
         for (CommandParser.ParsedCommand command : commands) {
+            PermissionGrantParser.Attempt grant = PermissionGrantParser.find(command, snapshot);
+            if (snapshot.permissionRemediationEnabled() && snapshot.blockProtectedPermissionCommands()
+                    && grant != null && (grant.targetType() == PermissionGrantParser.TargetType.GROUP
+                    || !isTrustedPermissionTarget(grant.target(), snapshot))) {
+                record(sender, "blocked-protected-permission-grant",
+                        grant.targetType().name().toLowerCase(Locale.ROOT) + ':' + grant.permission());
+                return Decision.BLOCK_PROTECTED_PERMISSION_GRANT;
+            }
             if (command.label().equals("op")) {
                 if (command.arguments().isEmpty() || !engine.mayOpTarget(command.arguments().getFirst())) {
                     record(sender, "blocked-op-target", command.arguments().isEmpty() ? "missing" : "untrusted");
@@ -75,6 +83,11 @@ public final class CommandGuard {
 
     private static boolean isConsole(CommandSender sender) {
         return sender instanceof ConsoleCommandSender || sender instanceof RemoteConsoleCommandSender;
+    }
+
+    private boolean isTrustedPermissionTarget(String target, SecuritySettings snapshot) {
+        return snapshot.isTrustedPermissionTarget(target)
+                || engine != null && engine.mayGrantPermissionTarget(target);
     }
 
     private void record(CommandSender sender, String action, String detail) {
@@ -100,6 +113,7 @@ public final class CommandGuard {
         BLOCK_RUNTIME_UNLOAD,
         BLOCK_OP_TARGET,
         BLOCK_OP_SENDER,
+        BLOCK_PROTECTED_PERMISSION_GRANT,
         BLOCK_PRIVILEGE_COMMAND
     }
 }

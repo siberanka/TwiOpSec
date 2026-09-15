@@ -6,3 +6,14 @@ author: siberanka
 website: https://github.com/siberanka/TwiOpSec
 api-version: '26.2'
 folia-supported: true
+dependencies:
+  server:
+    LuckPerms:
+      load: BEFORE
+      required: false
+    Vault:
+      load: BEFORE
+      required: false
+    Citizens:
+      load: BEFORE
+      required: false

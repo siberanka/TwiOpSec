@@ -6,5 +6,6 @@ public enum CheckTrigger {
     INTERACT,
     CHAT,
     PERIODIC,
+    PERMISSION_CHANGE,
     MANUAL
 }

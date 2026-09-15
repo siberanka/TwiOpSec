@@ -17,6 +17,18 @@ enforcement:
   unauthorized-operator-commands: []
   unauthorized-permission-commands: []
 
+# Positive assignments matching protected-permissions are intercepted before
+# known permission commands run. LuckPerms changes are additionally observed
+# through its API; Vault/SuperPerms provide a best-effort fallback for other
+# permission managers. Trusted UUIDs may retain protected nodes, but groups may
+# never hold them because group membership is not an identity trust boundary.
+permission-remediation:
+  enabled: true
+  block-command-grants: true
+  luckperms-native-hook: true
+  vault-fallback: true
+  bukkit-attachment-fallback: true
+
 # Defaults are always unioned with imported T2C permissions and cannot disappear
 # merely because an older configuration is imported.
 protected-permissions:
@@ -56,6 +68,14 @@ updates:
   enabled: true
   connect-timeout-seconds: 5
   request-timeout-seconds: 5
+
+compatibility:
+  citizens:
+    # Disabled by default. When enabled, only genuine Citizens-owned player NPC
+    # metadata may bypass the permission-state precheck for one direct
+    # /server <target> command with a conservative target-name format.
+    # OP, permission-management and unload protections remain fully enforced.
+    server-command-npc-bypass: false
 
 hardening:
   # This compatibility key cannot disable the invariant; false is ignored with a warning.

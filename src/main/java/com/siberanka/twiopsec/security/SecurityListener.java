@@ -24,13 +24,15 @@ public final class SecurityListener implements Listener {
     private final AtomicReference<SecuritySettings> settings;
     private final SecurityEngine engine;
     private final CommandGuard commandGuard;
+    private final CitizensNpcPolicy citizensNpcPolicy;
 
     public SecurityListener(TwiOpSecPlugin plugin, AtomicReference<SecuritySettings> settings,
-                            SecurityEngine engine, CommandGuard commandGuard) {
+                            SecurityEngine engine, CommandGuard commandGuard, CitizensNpcPolicy citizensNpcPolicy) {
         this.plugin = plugin;
         this.settings = settings;
         this.engine = engine;
         this.commandGuard = commandGuard;
+        this.citizensNpcPolicy = citizensNpcPolicy;
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -83,7 +85,10 @@ public final class SecurityListener implements Listener {
     }
 
     private void inspectPlayerCommand(PlayerCommandPreprocessEvent event) {
-        if (settings.get().checkOnCommand() && engine.checkPlayer(event.getPlayer(), CheckTrigger.COMMAND)) {
+        boolean narrowNpcBypass = citizensNpcPolicy.mayRunServerCommand(
+                event.getPlayer(), event.getMessage(), settings.get());
+        if (!narrowNpcBypass && settings.get().checkOnCommand()
+                && engine.checkPlayer(event.getPlayer(), CheckTrigger.COMMAND)) {
             event.setCancelled(true);
             return;
         }

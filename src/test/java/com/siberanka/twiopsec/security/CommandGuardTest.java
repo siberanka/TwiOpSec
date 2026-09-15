@@ -60,4 +60,47 @@ class CommandGuardTest {
 
         assertEquals(CommandGuard.Decision.BLOCK_RUNTIME_UNLOAD, guard.inspect(console, "auditreload"));
     }
+
+    @Test
+    void blocksProtectedPermissionGrantEvenFromConsoleButAllowsUnset() throws IOException {
+        Path config = temporary.resolve("permission-config.yml");
+        YamlConfiguration yaml = new YamlConfiguration();
+        yaml.set("enforcement.enabled", true);
+        yaml.save(config.toFile());
+        SecuritySettings settings = SettingsLoader.load(config.toFile(), ignored -> {
+        });
+        ConsoleCommandSender console = ConsoleCommandSender.class.cast(Proxy.newProxyInstance(
+                ConsoleCommandSender.class.getClassLoader(), new Class<?>[]{ConsoleCommandSender.class},
+                (proxy, method, args) -> method.getName().equals("getName") ? "CONSOLE"
+                        : method.getReturnType() == boolean.class ? false : null));
+        CommandGuard guard = new CommandGuard(new AtomicReference<>(settings), null, () -> null);
+
+        assertEquals(CommandGuard.Decision.BLOCK_PROTECTED_PERMISSION_GRANT,
+                guard.inspect(console, "lp user BadActor permission set luckperms.* true"));
+        assertEquals(CommandGuard.Decision.ALLOW,
+                guard.inspect(console, "lp user BadActor permission unset luckperms.*"));
+    }
+
+    @Test
+    void informationalNamesCannotAuthorizeProtectedGrantsWithoutUuidResolution() throws IOException {
+        Path config = temporary.resolve("trusted-target.yml");
+        YamlConfiguration yaml = new YamlConfiguration();
+        String trustedUuid = "12345678-1234-1234-1234-1234567890ab";
+        yaml.set("trusted.operators.owner.name", "Owner_1");
+        yaml.set("trusted.operators.owner.uuid", trustedUuid);
+        yaml.save(config.toFile());
+        SecuritySettings settings = SettingsLoader.load(config.toFile(), ignored -> { });
+        ConsoleCommandSender console = ConsoleCommandSender.class.cast(Proxy.newProxyInstance(
+                ConsoleCommandSender.class.getClassLoader(), new Class<?>[]{ConsoleCommandSender.class},
+                (proxy, method, args) -> method.getName().equals("getName") ? "CONSOLE"
+                        : method.getReturnType() == boolean.class ? false : null));
+        CommandGuard guard = new CommandGuard(new AtomicReference<>(settings), null, () -> null);
+
+        assertEquals(CommandGuard.Decision.ALLOW,
+                guard.inspect(console, "lp user " + trustedUuid + " permission set minecraft.command.op true"));
+        assertEquals(CommandGuard.Decision.BLOCK_PROTECTED_PERMISSION_GRANT,
+                guard.inspect(console, "lp user Owner_1 permission set minecraft.command.op true"));
+        assertEquals(CommandGuard.Decision.BLOCK_PROTECTED_PERMISSION_GRANT,
+                guard.inspect(console, "lp group " + trustedUuid + " permission set minecraft.command.op true"));
+    }
 }

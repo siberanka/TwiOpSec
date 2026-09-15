@@ -23,7 +23,8 @@ Folia satırındaki `beta`, TwiOpSec'in değil test edilen resmî Folia sunucu y
 - Başlangıçta sunucunun kalıcı OP kayıtları UUID beyaz listesiyle uzlaştırılır; önceden kalmış yetkisiz çevrimdışı OP kayıtları temizlenir.
 - Join, command, interact, chat ve periyodik kontroller T2C ayarlarından taşınabilir.
 - `/op` hedefi güven listesinde değilse engellenir; çevrimdışı hedef varsayılan olarak reddedilir.
-- LuckPerms/PEX benzeri ayrıcalık komutları güvenilmeyen oyuncu ve command block göndericilerine kapatılır.
+- LuckPerms/PEX/GroupManager ayrıcalık komutları güvenilmeyen oyuncu ve command block göndericilerine kapatılır. Korunan bir düğümü güvenilmeyen kullanıcıya veya herhangi bir gruba veren pozitif komutlar konsoldan gelse bile yürütülmeden engellenir.
+- LuckPerms varsa korunan pozitif kullanıcı/grup düğümleri API olayında, kullanıcı yüklenirken ve açılış/reload uzlaştırmasında kaldırılır. Normal düğüm değişiklikleri asenkron kaydedilir; transient düğümler kalıcılaştırılmaz. Depolama hatası konsol/audit uyarısı üretir. Diğer sağlayıcılarda Vault ve Bukkit attachment yolları yalnızca en iyi çaba geri dönüşüdür; Vault 1.7.3 Folia uyumlu değildir.
 - Vanilla `execute`/`return`, yaygın dispatch wrapper zincirleri ve sınırlı/özyineleme güvenli `commands.yml` alias genişletmeleri içindeki komutlar da incelenir. Bilinen ve yapılandırılabilir plugin-manager kökleriyle TwiOpSec'i runtime'da unload/reload etme ve Paper/Bukkit `/reload` denemeleri engellenir.
 - Paper eklenti classloader izolasyonu kullanılır; JAR içinde legacy `plugin.yml` bulunmaz.
 - Sunucunun gerçek `stop` akışı engellenmez. Beklenmeyen disable sonraki açılış için kanıt işareti bırakır.
@@ -34,9 +35,21 @@ Varsayılan korunan düğümler şunlardır ve import sırasında silinmez: `*`,
 
 `*` burada bütün izinlerle eşleşen bir glob değil, izin sistemindeki gerçek kök `*` düğümüdür. Böylece yalnızca OP olduğu için varsayılan gelen zararsız izinler bütün oyuncuları yanlışlıkla cezalandırmaz.
 
+## Citizens sunucu NPC uyumluluğu
+
+Varsayılan kapalı olan `compatibility.citizens.server-command-npc-bypass: true` ayarı, yalnızca etkin Citizens eklentisinin sahip olduğu gerçek `NPC=true` metadata'sına sahip player NPC için tek bir doğrudan `/server <hedef>` komutunda permission-state ön kontrolünü atlar. Hedef adı 1–64 karakterlik güvenli biçimle sınırlıdır. Namespace'li `bungeecord:server` kabul edilir; `/execute`, ek argüman, iç içe slash komutu, `/op`, permission-manager ve unload/reload yolları istisna değildir.
+
+Citizens komutunu NPC kimliğiyle çalıştırmak için örnek:
+
+```text
+/npc command add -n server survival
+```
+
+Citizens yoksa veya kapalıysa ayar fail-closed kalır ve konsola uyarı yazar. Tıklayan oyuncu olarak çalışan `-p` modu bu özel NPC kimliği istisnasına girmez; Citizens'ın Bungee `server` özel davranışı ayrıca kendi dokümantasyonunda açıklanır.
+
 ## Kurulum ve T2C importu
 
-1. Sunucuyu durdurun ve `plugins/TwiOpSec-1.2.0.jar` dosyasını yerleştirin.
+1. Sunucuyu durdurun ve `plugins/TwiOpSec-1.3.0.jar` dosyasını yerleştirin.
 2. Eski `plugins/T2C-OPSecurity/` klasörünü ilk açılışta yerinde bırakın.
 3. Sunucuyu başlatın. TwiOpSec, `config.yml`, `opWhitelist.yml` ve `permissionWhitelist.yml` dosyalarının tamamını güvenli biçimde okuyamazsa importu commit etmez. Geçerli son ayar yoksa fail-closed olarak sunucuyu durdurur.
 4. Logdaki import sayılarını kontrol edin ve `plugins/TwiOpSec/config.yml` içindeki iki güven listesini gözden geçirin.
@@ -81,7 +94,7 @@ Gerçek T2C dosyalarının geçici kopyasıyla import regresyon testi:
 .\gradlew.bat clean test jar -PlegacyT2Dir='D:\path\to\plugins\T2C-OPSecurity'
 ```
 
-Derleme çıktısı `build/libs/TwiOpSec-1.2.0.jar` olur. Projede CI/CD tanımı bilinçli olarak yoktur; doğrulama ve yayın yerel kalite kapılarıyla yapılır.
+Derleme çıktısı `build/libs/TwiOpSec-1.3.0.jar` olur. Projede CI/CD tanımı bilinçli olarak yoktur; doğrulama ve yayın yerel kalite kapılarıyla yapılır.
 
 ## Sınırlar ve kaynaklar
 

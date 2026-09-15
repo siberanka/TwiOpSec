@@ -8,8 +8,10 @@ import com.siberanka.twiopsec.config.ServerAliasLoader;
 import com.siberanka.twiopsec.config.SettingsLoader;
 import com.siberanka.twiopsec.security.AuditLogger;
 import com.siberanka.twiopsec.security.CommandGuard;
+import com.siberanka.twiopsec.security.CitizensNpcPolicy;
 import com.siberanka.twiopsec.security.SecurityEngine;
 import com.siberanka.twiopsec.security.SecurityListener;
+import com.siberanka.twiopsec.security.PermissionRemediator;
 import com.siberanka.twiopsec.update.UpdateChecker;
 import com.siberanka.twiopsec.update.UpdateNotice;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
@@ -43,6 +45,7 @@ public final class TwiOpSecPlugin extends JavaPlugin {
     private final AtomicBoolean unexpectedDisableMarked = new AtomicBoolean();
     private final AtomicBoolean commandsRegistered = new AtomicBoolean();
     private SecurityEngine engine;
+    private PermissionRemediator permissionRemediator;
     private LegacyImporter importer;
     private Path dataFolder;
     private volatile String legacySourceFolder = "T2C-OPSecurity";
@@ -92,9 +95,17 @@ public final class TwiOpSecPlugin extends JavaPlugin {
         if (securitySettings.auditLog()) {
             audit.set(new AuditLogger(dataFolder, securitySettings.auditQueueCapacity(), getLogger()));
         }
-        engine = new SecurityEngine(this, settings, audit);
+        CitizensNpcPolicy citizensNpcPolicy = CitizensNpcPolicy.discover(getServer());
+        if (securitySettings.citizensServerCommandNpcBypass() && !citizensNpcPolicy.isCitizensAvailable()) {
+            getLogger().warning("Citizens NPC compatibility is enabled, but an enabled Citizens plugin was not found; "
+                    + "NPC bypass remains inactive.");
+        }
+        permissionRemediator = new PermissionRemediator(this, settings, audit);
+        permissionRemediator.start();
+        engine = new SecurityEngine(this, settings, audit, permissionRemediator);
         CommandGuard guard = new CommandGuard(settings, engine, audit::get, serverAliases);
-        getServer().getPluginManager().registerEvents(new SecurityListener(this, settings, engine, guard), this);
+        getServer().getPluginManager().registerEvents(
+                new SecurityListener(this, settings, engine, guard, citizensNpcPolicy), this);
 
         registerCommands();
         engine.reconcileStoredOperators();
@@ -195,6 +206,7 @@ public final class TwiOpSecPlugin extends JavaPlugin {
         if (old != null) {
             old.close();
         }
+        permissionRemediator.start();
         legacySourceFolder = loaded.legacySourceFolder();
         usingLastKnownGood = false;
         engine.restartPeriodicTask();
