@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.siberanka.twiopsec"
-version = "1.3.1"
+version = "1.3.2"
 val pluginVersion = version.toString()
 
 repositories {

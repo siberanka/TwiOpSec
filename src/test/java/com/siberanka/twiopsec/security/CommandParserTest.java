@@ -20,6 +20,18 @@ class CommandParserTest {
     }
 
     @Test
+    void parsesTurkishAliasesAndExpandsProtectedCommands() {
+        var command = CommandParser.parse(" /görevler 1 ");
+        assertEquals(CommandParser.ParseStatus.VALID, command.status());
+        assertEquals("görevler", command.label());
+        assertTrue(CommandParser.parseChain("cüzdan Intruder", Map.of("cüzdan", List.of("op $1")), "CONSOLE")
+                .stream().anyMatch(parsed -> parsed.label().equals("op")
+                        && parsed.arguments().equals(List.of("Intruder"))));
+        assertEquals(CommandParser.ParseStatus.INVALID, CommandParser.parse("görevler/op Intruder").status());
+        assertEquals(CommandParser.ParseStatus.INVALID, CommandParser.parse("оp Intruder").status());
+    }
+
+    @Test
     void blocksKnownRuntimeUnloadFormsButNotServerStopOrDatapackReload() {
         assertTrue(CommandParser.attemptsRuntimeUnload(CommandParser.parse("plugman disable TwiOpSec")));
         assertTrue(CommandParser.attemptsRuntimeUnload(CommandParser.parse("plugmanx:plm reload all")));

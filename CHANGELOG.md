@@ -2,6 +2,12 @@
 
 All notable changes use Semantic Versioning.
 
+## 1.3.2 - 2026-09-15
+
+- Accept bounded Turkish Latin command aliases in `commands.yml` and command parsing using one shared validation rule; retain strict ASCII-only command namespaces and reject whitespace, slashes, and non-Latin confusables.
+- Fix production startup fail-closed on existing Turkish Bukkit alias names without editing aliases or disabling enforcement.
+- Add loader, parser, alias expansion, and unsafe-name regression tests and isolated Leaf runtime tests with actual read-only backend alias files.
+
 ## 1.3.1 - 2026-09-15
 
 - Fixed protected permission matching so a configured `plugin.*` protects only that actual wildcard grant instead of deleting every ordinary child permission.

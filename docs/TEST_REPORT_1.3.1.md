@@ -30,3 +30,5 @@ Before production rollout, LuckPerms exports were inspected without publishing h
 ## Limits
 
 The compatibility run did not connect a real player client and did not load production worlds. Same-JVM malicious plugins remain inside the Bukkit/Paper trust boundary; host controls, allowlisted plugins and current server software are still required.
+
+After publication, a production-shaped server with 22 existing Turkish Latin alias names in `commands.yml` rejected those names at startup and stopped under the intended fail-closed policy. The initial isolated test had not mounted that actual alias file. The affected server was restored to its previous hash-verified security JARs, and 1.3.2 corrects both alias loading and parsing with an actual read-only alias-file runtime test. Use 1.3.2 or newer on servers with Turkish aliases.

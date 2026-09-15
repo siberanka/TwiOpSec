@@ -8,6 +8,9 @@ import java.util.Map;
 import java.util.Set;
 
 public final class CommandParser {
+    // Bukkit aliases can contain Turkish Latin letters; keep command labels bounded and reject separators.
+    private static final String LABEL_PATTERN =
+            "[a-z0-9_.\\x{00E7}\\x{011F}\\x{0131}\\x{00F6}\\x{015F}\\x{00FC}\\x{0307}-]{1,128}";
     public static final Set<String> DEFAULT_PLUGIN_MANAGER_ROOTS = Set.of(
             "plugman", "plugmanx", "plm", "pluginmanager", "plugin-manager", "plugmanager",
             "plugincontrol", "plugincontroller", "serverutils", "serverutilities", "pm", "pman"
@@ -46,10 +49,14 @@ public final class CommandParser {
         int colon = rawLabel.lastIndexOf(':');
         String namespace = colon < 0 ? "" : rawLabel.substring(0, colon);
         String label = colon < 0 ? rawLabel : rawLabel.substring(colon + 1);
-        if (!label.matches("[a-z0-9_.-]{1,128}") || !namespace.matches("[a-z0-9_.-]{0,128}")) {
+        if (!isValidLabel(label) || !namespace.matches("[a-z0-9_.-]{0,128}")) {
             return ParsedCommand.INVALID;
         }
         return new ParsedCommand(label, namespace, List.copyOf(arguments), ParseStatus.VALID);
+    }
+
+    public static boolean isValidLabel(String label) {
+        return label != null && label.matches(LABEL_PATTERN);
     }
 
     /**

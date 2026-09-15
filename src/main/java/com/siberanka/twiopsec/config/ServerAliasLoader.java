@@ -1,5 +1,7 @@
 package com.siberanka.twiopsec.config;
 
+import com.siberanka.twiopsec.security.CommandParser;
+
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -48,7 +50,7 @@ public final class ServerAliasLoader {
         Map<String, List<String>> result = new LinkedHashMap<>();
         for (String rawName : aliases.getKeys(false)) {
             String name = rawName.toLowerCase(Locale.ROOT);
-            if (!name.matches("[a-z0-9_.-]{1,128}")) {
+            if (!CommandParser.isValidLabel(name)) {
                 throw new IOException("Invalid command alias name in commands.yml");
             }
             Object value = aliases.get(rawName);
